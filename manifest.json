@@ -1,15 +1,16 @@
 
 {
   "manifest_version": 2,
-  "name": "Web to Notion",
+  "name": "Web to Notion AI",
   "version": "1.0",
-  "description": "Save webpage content to Notion with AI-powered processing",
+  "description": "Save webpage content to Notion with AI-powered processing via Supabase",
   
   "permissions": [
     "activeTab",
     "storage",
     "https://api.openai.com/*",
-    "https://api.notion.com/*"
+    "https://api.notion.com/*",
+    "https://ypkfdgvuipvfhktqqmpr.supabase.co/*"
   ],
   
   "background": {
@@ -19,7 +20,7 @@
   
   "browser_action": {
     "default_popup": "popup.html",
-    "default_title": "Save to Notion",
+    "default_title": "Save to Notion with AI",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

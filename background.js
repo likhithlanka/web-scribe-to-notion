@@ -1,6 +1,8 @@
 
 class WebToNotionBackground {
   constructor() {
+    this.supabaseUrl = 'https://ypkfdgvuipvfhktqqmpr.supabase.co';
+    this.supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlwa2ZkZ3Z1aXB2ZmhrdHFxbXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyMDAxNjMsImV4cCI6MjA2Mzc3NjE2M30.1TpqOeg3fPgSi8TR_TFrC99uyqqd_7XT03TaqvE6Saw';
     this.init();
   }
   
@@ -10,46 +12,33 @@ class WebToNotionBackground {
         this.handleSaveToNotion(message)
           .then(result => sendResponse(result))
           .catch(error => sendResponse({ success: false, error: error.message }));
-        return true; // Will respond asynchronously
+        return true;
       }
     });
   }
   
   async handleSaveToNotion(message) {
     try {
-      // Get configuration
-      const config = await browser.storage.local.get(['openaiKey', 'notionKey', 'notionDbId']);
+      // Get user settings
+      const settings = await browser.storage.local.get(['notionDbId']);
       
-      if (!config.openaiKey || !config.notionKey || !config.notionDbId) {
-        throw new Error('Missing API configuration');
+      if (!settings.notionDbId) {
+        throw new Error('Notion Database ID not configured');
       }
       
       // Extract page content
       const pageContent = await this.extractPageContent(message.tabId);
       
-      // Get existing tags from Notion
-      const existingTags = await this.getNotionTags(config.notionKey, config.notionDbId);
-      
-      // Process content with OpenAI
-      const aiResult = await this.processWithOpenAI(
-        config.openaiKey,
+      // Process with Supabase edge function
+      const result = await this.processWithSupabase(
+        message.user,
         pageContent,
-        existingTags
+        message.title,
+        message.url,
+        settings.notionDbId
       );
       
-      // Save to Notion
-      await this.saveToNotion(
-        config.notionKey,
-        config.notionDbId,
-        {
-          title: message.title,
-          url: message.url,
-          extractedText: aiResult.extractedText,
-          suggestedTags: aiResult.suggestedTags
-        }
-      );
-      
-      return { success: true };
+      return { success: true, result };
     } catch (error) {
       console.error('Save to Notion error:', error);
       return { success: false, error: error.message };
@@ -58,200 +47,46 @@ class WebToNotionBackground {
   
   async extractPageContent(tabId) {
     return new Promise((resolve, reject) => {
-      browser.tabs.executeScript(tabId, {
-        code: `
-          // Extract main content from the page
-          function extractContent() {
-            // Remove script and style elements
-            const scripts = document.querySelectorAll('script, style, nav, header, footer, aside');
-            scripts.forEach(el => el.remove());
-            
-            // Try to find main content area
-            let mainContent = document.querySelector('main, article, .content, .post, #content');
-            if (!mainContent) {
-              mainContent = document.body;
-            }
-            
-            // Get text content and clean it up
-            let text = mainContent.innerText || mainContent.textContent || '';
-            
-            // Clean up whitespace and formatting
-            text = text.replace(/\\n\\s*\\n/g, '\\n\\n'); // Remove extra line breaks
-            text = text.replace(/\\s+/g, ' '); // Normalize spaces
-            text = text.trim();
-            
-            return text;
-          }
-          
-          extractContent();
-        `
-      }, (result) => {
+      browser.tabs.sendMessage(tabId, { action: 'extractContent' }, (response) => {
         if (browser.runtime.lastError) {
           reject(new Error(browser.runtime.lastError.message));
+        } else if (response && response.success) {
+          resolve(response.content);
         } else {
-          resolve(result[0] || '');
+          reject(new Error(response?.error || 'Failed to extract content'));
         }
       });
     });
   }
   
-  async getNotionTags(notionKey, databaseId) {
+  async processWithSupabase(user, content, title, url, notionDbId) {
     try {
-      const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${notionKey}`,
-          'Notion-Version': '2022-06-28',
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Notion API error: ${response.status}`);
-      }
-      
-      const database = await response.json();
-      
-      // Extract existing tags from the Tags property
-      const tagsProperty = database.properties.Tags;
-      if (tagsProperty && tagsProperty.type === 'multi_select') {
-        return tagsProperty.multi_select.options.map(option => option.name);
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('Error getting Notion tags:', error);
-      return [];
-    }
-  }
-  
-  async processWithOpenAI(apiKey, content, existingTags) {
-    const prompt = `Analyze the following webpage content and:
-1. Extract the main text, removing any unnecessary elements
-2. Suggest up to 5 relevant tags from this list of existing tags: [${existingTags.join(', ')}]
-3. Format the response as JSON:
-{
-    "extractedText": "...",
-    "suggestedTags": ["tag1", "tag2", ...]
-}
-
-Webpage content:
-${content.substring(0, 4000)}`; // Limit content length
-    
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/process-notion-save`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${this.supabaseKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant that extracts and processes webpage content. Always respond with valid JSON.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 2000,
-          temperature: 0.3
+          user: user,
+          content: content,
+          title: title,
+          url: url,
+          notionDbId: notionDbId
         })
       });
       
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        const errorData = await response.text();
+        throw new Error(`Supabase function error: ${response.status} - ${errorData}`);
       }
       
-      const data = await response.json();
-      const aiResponse = data.choices[0].message.content;
-      
-      // Parse JSON response
-      try {
-        return JSON.parse(aiResponse);
-      } catch (parseError) {
-        // Fallback if JSON parsing fails
-        return {
-          extractedText: content.substring(0, 2000),
-          suggestedTags: []
-        };
-      }
+      return await response.json();
     } catch (error) {
-      console.error('OpenAI processing error:', error);
-      // Fallback to original content
-      return {
-        extractedText: content.substring(0, 2000),
-        suggestedTags: []
-      };
+      console.error('Supabase processing error:', error);
+      throw error;
     }
-  }
-  
-  async saveToNotion(notionKey, databaseId, data) {
-    const pageData = {
-      parent: {
-        database_id: databaseId
-      },
-      properties: {
-        Name: {
-          title: [
-            {
-              text: {
-                content: data.title || 'Untitled'
-              }
-            }
-          ]
-        },
-        URL: {
-          url: data.url
-        },
-        Tags: {
-          multi_select: data.suggestedTags.map(tag => ({ name: tag }))
-        },
-        Created: {
-          date: {
-            start: new Date().toISOString()
-          }
-        }
-      },
-      children: [
-        {
-          object: 'block',
-          type: 'paragraph',
-          paragraph: {
-            rich_text: [
-              {
-                type: 'text',
-                text: {
-                  content: data.extractedText.substring(0, 2000) // Notion has limits
-                }
-              }
-            ]
-          }
-        }
-      ]
-    };
-    
-    const response = await fetch('https://api.notion.com/v1/pages', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${notionKey}`,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(pageData)
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Notion API error: ${errorData.message || response.status}`);
-    }
-    
-    return await response.json();
   }
 }
 
-// Initialize background script
 new WebToNotionBackground();

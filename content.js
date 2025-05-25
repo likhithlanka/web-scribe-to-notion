@@ -1,12 +1,10 @@
 
-// Content script for enhanced webpage content extraction
 class WebContentExtractor {
   constructor() {
     this.init();
   }
   
   init() {
-    // Listen for messages from background script
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.action === 'extractContent') {
         try {
@@ -20,10 +18,8 @@ class WebContentExtractor {
   }
   
   extractContent() {
-    // Create a copy of the document to avoid modifying the original
     const doc = document.cloneNode(true);
     
-    // Remove unwanted elements
     const unwantedSelectors = [
       'script', 'style', 'nav', 'header', 'footer', 'aside',
       '.sidebar', '.menu', '.navigation', '.ads', '.advertisement',
@@ -36,11 +32,9 @@ class WebContentExtractor {
       elements.forEach(el => el.remove());
     });
     
-    // Try to find the main content area
     let mainContent = doc.querySelector('main, article, .content, .post, #content, .entry-content');
     
     if (!mainContent) {
-      // Fallback to body but try to exclude obvious non-content elements
       mainContent = doc.body;
     }
     
@@ -48,10 +42,7 @@ class WebContentExtractor {
       throw new Error('No content found on this page');
     }
     
-    // Extract text content
     let text = mainContent.textContent || mainContent.innerText || '';
-    
-    // Clean up the text
     text = this.cleanText(text);
     
     return {
@@ -64,12 +55,10 @@ class WebContentExtractor {
   }
   
   cleanText(text) {
-    // Remove extra whitespace and normalize line breaks
-    text = text.replace(/\s+/g, ' '); // Replace multiple spaces with single space
-    text = text.replace(/\n\s*\n/g, '\n\n'); // Normalize paragraph breaks
+    text = text.replace(/\s+/g, ' ');
+    text = text.replace(/\n\s*\n/g, '\n\n');
     text = text.trim();
     
-    // Remove common noise patterns
     text = text.replace(/Click here to .*/gi, '');
     text = text.replace(/Read more.*/gi, '');
     text = text.replace(/Subscribe to .*/gi, '');
@@ -79,5 +68,4 @@ class WebContentExtractor {
   }
 }
 
-// Initialize content extractor
 new WebContentExtractor();
