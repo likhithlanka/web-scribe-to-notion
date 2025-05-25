@@ -11,23 +11,38 @@ class WebToNotionBackground {
       if (message.action === 'saveToNotion') {
         this.handleSaveToNotion(message)
           .then(result => sendResponse(result))
-          .catch(error => sendResponse({ success: false, error: error.message }));
-        return true;
+          .catch(error => {
+            console.error('Background script error:', error);
+            sendResponse({ success: false, error: error.message });
+          });
+        return true; // Keep message channel open for async response
       }
     });
+    
+    // Log when extension starts
+    console.log('Web to Notion AI extension background script loaded');
   }
   
   async handleSaveToNotion(message) {
     try {
+      console.log('Processing save to Notion request for:', message.url);
+      
       // Get user settings
       const settings = await browser.storage.local.get(['notionDbId']);
       
       if (!settings.notionDbId) {
-        throw new Error('Notion Database ID not configured');
+        throw new Error('Notion Database ID not configured. Please configure it in the extension settings.');
       }
+      
+      console.log('Using Notion Database ID:', settings.notionDbId);
       
       // Extract page content
       const pageContent = await this.extractPageContent(message.tabId);
+      console.log('Extracted content:', {
+        title: pageContent.title,
+        wordCount: pageContent.wordCount,
+        domain: pageContent.domain
+      });
       
       // Process with Supabase edge function
       const result = await this.processWithSupabase(
@@ -38,6 +53,8 @@ class WebToNotionBackground {
         settings.notionDbId
       );
       
+      console.log('Supabase processing complete:', result);
+      
       return { success: true, result };
     } catch (error) {
       console.error('Save to Notion error:', error);
@@ -47,13 +64,19 @@ class WebToNotionBackground {
   
   async extractPageContent(tabId) {
     return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Content extraction timeout - page may not be ready'));
+      }, 10000); // 10 second timeout
+      
       browser.tabs.sendMessage(tabId, { action: 'extractContent' }, (response) => {
+        clearTimeout(timeout);
+        
         if (browser.runtime.lastError) {
-          reject(new Error(browser.runtime.lastError.message));
+          reject(new Error(`Content script error: ${browser.runtime.lastError.message}`));
         } else if (response && response.success) {
           resolve(response.content);
         } else {
-          reject(new Error(response?.error || 'Failed to extract content'));
+          reject(new Error(response?.error || 'Failed to extract content from page'));
         }
       });
     });
@@ -61,6 +84,8 @@ class WebToNotionBackground {
   
   async processWithSupabase(user, content, title, url, notionDbId) {
     try {
+      console.log('Sending request to Supabase edge function...');
+      
       const response = await fetch(`${this.supabaseUrl}/functions/v1/process-notion-save`, {
         method: 'POST',
         headers: {
@@ -78,13 +103,30 @@ class WebToNotionBackground {
       
       if (!response.ok) {
         const errorData = await response.text();
+        console.error('Supabase function error response:', errorData);
         throw new Error(`Supabase function error: ${response.status} - ${errorData}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown error from Supabase function');
+      }
+      
+      return result;
     } catch (error) {
       console.error('Supabase processing error:', error);
-      throw error;
+      
+      // Provide more specific error messages
+      if (error.message.includes('fetch')) {
+        throw new Error('Network error: Unable to connect to processing service');
+      } else if (error.message.includes('401')) {
+        throw new Error('Authentication error: Please log in again');
+      } else if (error.message.includes('429')) {
+        throw new Error('Rate limit exceeded: Please wait before trying again');
+      } else {
+        throw error;
+      }
     }
   }
 }

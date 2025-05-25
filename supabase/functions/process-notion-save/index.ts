@@ -27,9 +27,11 @@ serve(async (req) => {
     
     // Get existing tags from Notion database
     const existingTags = await getNotionTags(notionKey, notionDbId);
+    console.log('Found existing tags:', existingTags);
     
     // Process content with OpenAI
     const aiResult = await processWithOpenAI(openaiKey, content, existingTags);
+    console.log('AI processing complete:', aiResult);
     
     // Save to Notion
     const notionResult = await saveToNotion(notionKey, notionDbId, {
@@ -38,11 +40,13 @@ serve(async (req) => {
       extractedText: aiResult.extractedText,
       suggestedTags: aiResult.suggestedTags
     });
+    console.log('Saved to Notion:', notionResult.id);
     
     return new Response(JSON.stringify({ 
       success: true, 
       aiResult,
-      notionResult 
+      notionResult,
+      notionPageId: notionResult.id
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -60,6 +64,7 @@ serve(async (req) => {
 
 async function getNotionTags(notionKey: string, databaseId: string) {
   try {
+    console.log('Getting tags from Notion database:', databaseId);
     const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
       method: 'GET',
       headers: {
@@ -70,7 +75,8 @@ async function getNotionTags(notionKey: string, databaseId: string) {
     });
     
     if (!response.ok) {
-      throw new Error(`Notion API error: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Notion API error: ${response.status} - ${errorText}`);
     }
     
     const database = await response.json();
@@ -89,9 +95,10 @@ async function getNotionTags(notionKey: string, databaseId: string) {
 
 async function processWithOpenAI(apiKey: string, content: any, existingTags: string[]) {
   const prompt = `Analyze the following webpage content and:
-1. Extract the main text, removing any unnecessary elements
+1. Extract the main text, removing any unnecessary elements like navigation, ads, headers, footers
 2. Suggest up to 5 relevant tags from this list of existing tags: [${existingTags.join(', ')}]
-3. Format the response as JSON:
+3. If no existing tags are relevant, you can suggest new tags that would be appropriate
+4. Format the response as JSON:
 {
     "extractedText": "...",
     "suggestedTags": ["tag1", "tag2", ...]
@@ -100,9 +107,12 @@ async function processWithOpenAI(apiKey: string, content: any, existingTags: str
 Webpage content:
 Title: ${content.title}
 URL: ${content.url}
+Domain: ${content.domain}
+Word Count: ${content.wordCount}
 Text: ${content.text.substring(0, 4000)}`;
 
   try {
+    console.log('Sending request to OpenAI...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -114,7 +124,7 @@ Text: ${content.text.substring(0, 4000)}`;
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that extracts and processes webpage content. Always respond with valid JSON.'
+            content: 'You are a helpful assistant that extracts and processes webpage content. Always respond with valid JSON only, no additional text or formatting.'
           },
           {
             role: 'user',
@@ -127,15 +137,21 @@ Text: ${content.text.substring(0, 4000)}`;
     });
     
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
     
     try {
-      return JSON.parse(aiResponse);
+      const parsedResponse = JSON.parse(aiResponse);
+      return {
+        extractedText: parsedResponse.extractedText || content.text.substring(0, 2000),
+        suggestedTags: parsedResponse.suggestedTags || []
+      };
     } catch (parseError) {
+      console.error('Failed to parse OpenAI response:', parseError);
       return {
         extractedText: content.text.substring(0, 2000),
         suggestedTags: []
@@ -194,6 +210,8 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
       }
     ]
   };
+  
+  console.log('Saving to Notion with data:', JSON.stringify(pageData, null, 2));
   
   const response = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',

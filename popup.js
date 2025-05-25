@@ -64,6 +64,9 @@ class WebToNotionPopup {
       return;
     }
     
+    this.elements.loginBtn.disabled = true;
+    this.showStatus('Logging in...', 'loading');
+    
     try {
       const response = await fetch(`${this.supabaseUrl}/auth/v1/token?grant_type=password`, {
         method: 'POST',
@@ -86,6 +89,8 @@ class WebToNotionPopup {
       }
     } catch (error) {
       this.showStatus('Login error: ' + error.message, 'error');
+    } finally {
+      this.elements.loginBtn.disabled = false;
     }
   }
   
@@ -97,6 +102,14 @@ class WebToNotionPopup {
       this.showStatus('Please enter email and password', 'error');
       return;
     }
+    
+    if (password.length < 6) {
+      this.showStatus('Password must be at least 6 characters', 'error');
+      return;
+    }
+    
+    this.elements.signupBtn.disabled = true;
+    this.showStatus('Creating account...', 'loading');
     
     try {
       const response = await fetch(`${this.supabaseUrl}/auth/v1/signup`, {
@@ -111,12 +124,21 @@ class WebToNotionPopup {
       const data = await response.json();
       
       if (response.ok) {
-        this.showStatus('Account created! Please check your email for verification.', 'success');
+        if (data.user && !data.user.email_confirmed_at) {
+          this.showStatus('Account created! Please check your email for verification.', 'success');
+        } else {
+          this.user = data.user;
+          await browser.storage.local.set({ supabase_session: data });
+          this.updateAuthUI();
+          this.showStatus('Account created and logged in!', 'success');
+        }
       } else {
         this.showStatus(data.error_description || 'Signup failed', 'error');
       }
     } catch (error) {
       this.showStatus('Signup error: ' + error.message, 'error');
+    } finally {
+      this.elements.signupBtn.disabled = false;
     }
   }
   
@@ -169,6 +191,12 @@ class WebToNotionPopup {
       return;
     }
     
+    // Validate Notion Database ID format (should be 32 characters hex)
+    if (!/^[a-f0-9]{32}$/.test(settings.notionDbId)) {
+      this.showStatus('Invalid Notion Database ID format. It should be 32 characters long.', 'error');
+      return;
+    }
+    
     try {
       await browser.storage.local.set(settings);
       this.showStatus('Settings saved successfully!', 'success');
@@ -184,12 +212,30 @@ class WebToNotionPopup {
       return;
     }
     
+    // Check if Notion Database ID is configured
+    const settings = await browser.storage.local.get(['notionDbId']);
+    if (!settings.notionDbId) {
+      this.showStatus('Please configure your Notion Database ID in settings', 'error');
+      this.elements.settingsForm.classList.add('visible');
+      return;
+    }
+    
     this.elements.saveBtn.disabled = true;
-    this.showStatus('Processing page content...', 'loading');
+    this.showStatus('Extracting page content...', 'loading');
     
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const currentTab = tabs[0];
+      
+      // Basic validation for supported URLs
+      if (currentTab.url.startsWith('chrome://') || 
+          currentTab.url.startsWith('moz-extension://') || 
+          currentTab.url.startsWith('about:')) {
+        this.showStatus('Cannot save browser internal pages', 'error');
+        return;
+      }
+      
+      this.showStatus('Processing with AI...', 'loading');
       
       const response = await browser.runtime.sendMessage({
         action: 'saveToNotion',
@@ -200,12 +246,16 @@ class WebToNotionPopup {
       });
       
       if (response.success) {
-        this.showStatus('Successfully saved to Notion!', 'success');
+        this.showStatus('✅ Successfully saved to Notion!', 'success');
+        if (response.result && response.result.notionPageId) {
+          console.log('Notion page created:', response.result.notionPageId);
+        }
       } else {
-        this.showStatus(response.error || 'Failed to save to Notion', 'error');
+        this.showStatus('❌ ' + (response.error || 'Failed to save to Notion'), 'error');
       }
     } catch (error) {
-      this.showStatus('Error: ' + error.message, 'error');
+      console.error('Save error:', error);
+      this.showStatus('❌ Error: ' + error.message, 'error');
     } finally {
       this.elements.saveBtn.disabled = false;
     }
@@ -219,7 +269,7 @@ class WebToNotionPopup {
     if (type === 'success') {
       setTimeout(() => {
         this.elements.status.style.display = 'none';
-      }, 3000);
+      }, 5000);
     }
   }
 }
