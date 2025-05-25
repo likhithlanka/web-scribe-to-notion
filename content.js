@@ -1,11 +1,10 @@
-
 class WebContentExtractor {
   constructor() {
     this.init();
   }
   
   init() {
-    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.action === 'extractContent') {
         try {
           const content = this.extractContent();

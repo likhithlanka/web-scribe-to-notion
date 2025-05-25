@@ -1,4 +1,3 @@
-
 class WebToNotionPopup {
   constructor() {
     this.supabaseUrl = 'https://ypkfdgvuipvfhktqqmpr.supabase.co';
@@ -45,7 +44,7 @@ class WebToNotionPopup {
   
   async checkAuthStatus() {
     try {
-      const { data } = await browser.storage.local.get(['supabase_session']);
+      const data = await chrome.storage.local.get(['supabase_session']);
       if (data.supabase_session) {
         this.user = data.supabase_session.user;
         this.updateAuthUI();
@@ -81,7 +80,7 @@ class WebToNotionPopup {
       
       if (response.ok) {
         this.user = data.user;
-        await browser.storage.local.set({ supabase_session: data });
+        await chrome.storage.local.set({ supabase_session: data });
         this.updateAuthUI();
         this.showStatus('Logged in successfully!', 'success');
       } else {
@@ -128,7 +127,7 @@ class WebToNotionPopup {
           this.showStatus('Account created! Please check your email for verification.', 'success');
         } else {
           this.user = data.user;
-          await browser.storage.local.set({ supabase_session: data });
+          await chrome.storage.local.set({ supabase_session: data });
           this.updateAuthUI();
           this.showStatus('Account created and logged in!', 'success');
         }
@@ -144,7 +143,7 @@ class WebToNotionPopup {
   
   async logout() {
     try {
-      await browser.storage.local.remove(['supabase_session']);
+      await chrome.storage.local.remove(['supabase_session']);
       this.user = null;
       this.updateAuthUI();
       this.showStatus('Logged out successfully', 'success');
@@ -170,7 +169,7 @@ class WebToNotionPopup {
   
   async loadSettings() {
     try {
-      const result = await browser.storage.local.get(['notionDbId']);
+      const result = await chrome.storage.local.get(['notionDbId']);
       if (result.notionDbId) this.elements.notionDbId.value = result.notionDbId;
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -198,7 +197,7 @@ class WebToNotionPopup {
     }
     
     try {
-      await browser.storage.local.set(settings);
+      await chrome.storage.local.set(settings);
       this.showStatus('Settings saved successfully!', 'success');
       this.elements.settingsForm.classList.remove('visible');
     } catch (error) {
@@ -213,7 +212,7 @@ class WebToNotionPopup {
     }
     
     // Check if Notion Database ID is configured
-    const settings = await browser.storage.local.get(['notionDbId']);
+    const settings = await chrome.storage.local.get(['notionDbId']);
     if (!settings.notionDbId) {
       this.showStatus('Please configure your Notion Database ID in settings', 'error');
       this.elements.settingsForm.classList.add('visible');
@@ -224,12 +223,12 @@ class WebToNotionPopup {
     this.showStatus('Extracting page content...', 'loading');
     
     try {
-      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       const currentTab = tabs[0];
       
       // Basic validation for supported URLs
       if (currentTab.url.startsWith('chrome://') || 
-          currentTab.url.startsWith('moz-extension://') || 
+          currentTab.url.startsWith('chrome-extension://') || 
           currentTab.url.startsWith('about:')) {
         this.showStatus('Cannot save browser internal pages', 'error');
         return;
@@ -237,7 +236,7 @@ class WebToNotionPopup {
       
       this.showStatus('Processing with AI...', 'loading');
       
-      const response = await browser.runtime.sendMessage({
+      const response = await chrome.runtime.sendMessage({
         action: 'saveToNotion',
         tabId: currentTab.id,
         url: currentTab.url,

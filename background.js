@@ -1,4 +1,3 @@
-
 class WebToNotionBackground {
   constructor() {
     this.supabaseUrl = 'https://ypkfdgvuipvfhktqqmpr.supabase.co';
@@ -7,7 +6,7 @@ class WebToNotionBackground {
   }
   
   init() {
-    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.action === 'saveToNotion') {
         this.handleSaveToNotion(message)
           .then(result => sendResponse(result))
@@ -28,7 +27,7 @@ class WebToNotionBackground {
       console.log('Processing save to Notion request for:', message.url);
       
       // Get user settings
-      const settings = await browser.storage.local.get(['notionDbId']);
+      const settings = await chrome.storage.local.get(['notionDbId']);
       
       if (!settings.notionDbId) {
         throw new Error('Notion Database ID not configured. Please configure it in the extension settings.');
@@ -68,11 +67,11 @@ class WebToNotionBackground {
         reject(new Error('Content extraction timeout - page may not be ready'));
       }, 10000); // 10 second timeout
       
-      browser.tabs.sendMessage(tabId, { action: 'extractContent' }, (response) => {
+      chrome.tabs.sendMessage(tabId, { action: 'extractContent' }, (response) => {
         clearTimeout(timeout);
         
-        if (browser.runtime.lastError) {
-          reject(new Error(`Content script error: ${browser.runtime.lastError.message}`));
+        if (chrome.runtime.lastError) {
+          reject(new Error(`Content script error: ${chrome.runtime.lastError.message}`));
         } else if (response && response.success) {
           resolve(response.content);
         } else {
