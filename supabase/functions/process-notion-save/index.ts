@@ -37,7 +37,8 @@ serve(async (req) => {
       title,
       url,
       SummarizedText: aiResult.SummarizedText,
-      suggestedTags: aiResult.suggestedTags
+      suggestedTags: aiResult.suggestedTags,
+      MainTag: aiResult.MainTag
     });
     console.log('Saved to Notion:', notionResult.id);
     
@@ -93,23 +94,21 @@ async function getNotionTags(notionKey: string, databaseId: string) {
 }
 
 async function processWithOpenAI(apiKey: string, content: any, existingTags: string[]) {
-  const prompt = `You are an expert content summarizer. Analyze the following webpage and create a comprehensive yet concise summary.
+  const prompt = `You are an expert content summarizer and classifier.
 
-Your task:
+Your tasks:
 1. **Summarize the content** - Don't extract or copy the original text. Instead, create a well-structured markdown summary that captures the essence, main ideas, key insights, and important details of the webpage.
-
 2. **Provide complete context** - The summary should give readers a full understanding of what the page is about, its purpose, main arguments, and key takeaways.
-
 3. **Use proper markdown formatting** - Include headings (##), bullet points, **bold text** for emphasis, and other markdown elements to make it readable and well-structured.
-
 4. **Keep it concise but comprehensive** - Maximum 200 words, but ensure all important information is captured.
-
 5. **Suggest relevant tags** - Choose up to 5 tags from the existing list: [${existingTags.join(', ')}]. If none fit well, suggest new appropriate tags.
+6. **Categorize the page into a MainTag** - Choose the single most relevant tag from this list: [${existingTags.join(', ')}]. If none fit, set MainTag as "Unknown".
 
-6. **Respond in valid JSON format only**:
+**Respond in valid JSON format only**:
 {
-    "SummarizedText": "## Main Topic\n\nYour markdown-formatted summary here...",
-    "suggestedTags": ["tag1", "tag2", ...]
+    "SummarizedText": "## Main Topic\\n\\nYour markdown-formatted summary here...",
+    "suggestedTags": ["tag1", "tag2", ...],
+    "MainTag": "main_tag_here"
 }
 
 **Webpage to summarize:**
@@ -157,21 +156,24 @@ Remember: Create a summary that explains WHAT the page is about, WHY it matters,
       const parsedResponse = JSON.parse(aiResponse);
       return {
         SummarizedText: parsedResponse.SummarizedText || `## ${content.title}\n\nFailed to generate summary. Please check the content and try again.`,
-        suggestedTags: parsedResponse.suggestedTags || []
+        suggestedTags: parsedResponse.suggestedTags || [],
+        MainTag: parsedResponse.MainTag || "Unknown"
       };
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
       console.error('Raw OpenAI response:', aiResponse);
       return {
         SummarizedText: `## ${content.title}\n\nFailed to parse AI summary. Raw content available on the source page.`,
-        suggestedTags: []
+        suggestedTags: [],
+        MainTag: "Unknown"
       };
     }
   } catch (error) {
     console.error('OpenAI processing error:', error);
     return {
       SummarizedText: `## ${content.title}\n\nFailed to process content with AI. Please try again later.`,
-      suggestedTags: []
+      suggestedTags: [],
+      MainTag: "Unknown"
     };
   }
 }
@@ -213,6 +215,11 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
             }
           }
         ]
+      },
+      MainTag: {
+        select: {
+          name: data.MainTag || "Unknown"
+        }
       }
     },
     children: blocks
