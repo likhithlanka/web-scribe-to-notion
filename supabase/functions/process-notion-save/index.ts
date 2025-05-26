@@ -1,68 +1,64 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-
-serve(async (req) => {
+serve(async (req)=>{
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders
+    });
   }
-
   try {
     const { user, content, title, url, notionDbId } = await req.json();
-    
     // Get API keys from environment
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     const notionKey = Deno.env.get('NOTION_API_KEY');
-    
     if (!openaiKey || !notionKey) {
       throw new Error('Missing API keys. Please configure OPENAI_API_KEY and NOTION_API_KEY in Supabase Edge Function Secrets.');
     }
-    
     console.log('Processing content for user:', user.email);
-    
     // Get existing tags from Notion database
     const existingTags = await getNotionTags(notionKey, notionDbId);
     console.log('Found existing tags:', existingTags);
-    
     // Process content with OpenAI
     const aiResult = await processWithOpenAI(openaiKey, content, existingTags);
     console.log('AI processing complete:', aiResult);
-    
     // Save to Notion with properly formatted blocks
     const notionResult = await saveToNotion(notionKey, notionDbId, {
       title,
       url,
       SummarizedText: aiResult.SummarizedText,
-      suggestedTags: aiResult.suggestedTags,
-      MainTag: aiResult.MainTag
+      suggestedTags: aiResult.suggestedTags
     });
     console.log('Saved to Notion:', notionResult.id);
-    
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       aiResult,
       notionResult,
       notionPageId: notionResult.id
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
     });
   } catch (error) {
     console.error('Error in process-notion-save function:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message 
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
     });
   }
 });
-
-async function getNotionTags(notionKey: string, databaseId: string) {
+async function getNotionTags(notionKey, databaseId) {
   try {
     console.log('Getting tags from Notion database:', databaseId);
     const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
@@ -73,42 +69,42 @@ async function getNotionTags(notionKey: string, databaseId: string) {
         'Content-Type': 'application/json'
       }
     });
-    
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Notion API error: ${response.status} - ${errorText}`);
     }
-    
     const database = await response.json();
-    
     const tagsProperty = database.properties.MainTag;
-    if (tagsProperty && tagsProperty.type === 'multi_select') {
-      return tagsProperty.multi_select.options.map((option: any) => option.name);
+    if (tagsProperty && tagsProperty.type === 'select') {
+      return tagsProperty.select.options.map((option)=>option.name);
     }
-    
     return [];
   } catch (error) {
     console.error('Error getting Notion tags:', error);
     return [];
   }
 }
+async function processWithOpenAI(apiKey, content, existingTags) {
+  const prompt = `You are an expert content summarizer. Analyze the following webpage and create a comprehensive yet concise summary.
 
-async function processWithOpenAI(apiKey: string, content: any, existingTags: string[]) {
-  const prompt = `You are an expert content summarizer and classifier.
-
-Your tasks:
+Your task:
 1. **Summarize the content** - Don't extract or copy the original text. Instead, create a well-structured markdown summary that captures the essence, main ideas, key insights, and important details of the webpage.
-2. **Provide complete context** - The summary should give readers a full understanding of what the page is about, its purpose, main arguments, and key takeaways.
-3. **Use proper markdown formatting** - Include headings (##), bullet points, **bold text** for emphasis, and other markdown elements to make it readable and well-structured.
-4. **Keep it concise but comprehensive** - Maximum 200 words, but ensure all important information is captured.
-5. **Suggest relevant tags** - Choose up to 5 tags from the existing list: [${existingTags.join(', ')}]. If none fit well, suggest new appropriate tags.
-6. **Categorize the page into a MainTag** - Choose the single most relevant tag from this list: [${existingTags.join(', ')}]. If none fit, set MainTag as "Unknown".
 
-**Respond in valid JSON format only**:
+2. **Provide complete context** - The summary should give readers a full understanding of what the page is about, its purpose, main arguments, and key takeaways.
+
+3. **Use proper markdown formatting** - Include headings (##), bullet points, **bold text** for emphasis, and other markdown elements to make it readable and well-structured.
+
+4. **Keep it concise but comprehensive** - Maximum 200 words, but ensure all important information is captured.
+
+5. **Suggest relevant tags** - suggest up to 5 tags from the taking context from these tags [${existingTags.join(', ')}]. 
+
+6. **Main Tag** - Choose the main tag out of the existing list: [${existingTags.join(', ')}]. if none fit well, use miscellaneous as the main tag.
+
+6. **Respond in valid JSON format only**:
 {
-    "SummarizedText": "## Main Topic\\n\\nYour markdown-formatted summary here...",
+    "SummarizedText": "## Main Topic\n\nYour markdown-formatted summary here...",
     "suggestedTags": ["tag1", "tag2", ...],
-    "MainTag": "main_tag_here"
+    "MainTag: "Main Tag Name"
 }
 
 **Webpage to summarize:**
@@ -118,7 +114,6 @@ Your tasks:
 - Original Content: ${content.text.substring(0, 4000)}
 
 Remember: Create a summary that explains WHAT the page is about, WHY it matters, and WHAT the key insights are. Don't just extract or rephrase the original text.`;
-
   try {
     console.log('Sending request to OpenAI for summarization...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -143,45 +138,37 @@ Remember: Create a summary that explains WHAT the page is about, WHY it matters,
         temperature: 0.3
       })
     });
-    
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
-    
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
-    
     try {
       const parsedResponse = JSON.parse(aiResponse);
       return {
         SummarizedText: parsedResponse.SummarizedText || `## ${content.title}\n\nFailed to generate summary. Please check the content and try again.`,
-        suggestedTags: parsedResponse.suggestedTags || [],
-        MainTag: parsedResponse.MainTag || "Unknown"
+        suggestedTags: parsedResponse.suggestedTags || []
       };
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
       console.error('Raw OpenAI response:', aiResponse);
       return {
         SummarizedText: `## ${content.title}\n\nFailed to parse AI summary. Raw content available on the source page.`,
-        suggestedTags: [],
-        MainTag: "Unknown"
+        suggestedTags: []
       };
     }
   } catch (error) {
     console.error('OpenAI processing error:', error);
     return {
       SummarizedText: `## ${content.title}\n\nFailed to process content with AI. Please try again later.`,
-      suggestedTags: [],
-      MainTag: "Unknown"
+      suggestedTags: []
     };
   }
 }
-
-async function saveToNotion(notionKey: string, databaseId: string, data: any) {
+async function saveToNotion(notionKey, databaseId, data) {
   // Convert markdown content into Notion blocks
   const blocks = convertMarkdownToNotionBlocks(data.SummarizedText);
-
   const pageData = {
     parent: {
       database_id: databaseId
@@ -200,7 +187,9 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
         url: data.url
       },
       Tags: {
-        multi_select: data.suggestedTags.map((tag: string) => ({ name: tag }))
+        multi_select: data.suggestedTags.map((tag)=>({
+            name: tag
+          }))
       },
       Created: {
         date: {
@@ -215,18 +204,11 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
             }
           }
         ]
-      },
-      MainTag: {
-        select: {
-          name: data.MainTag || "Unknown"
-        }
       }
     },
     children: blocks
   };
-
   console.log('Saving to Notion with data:', JSON.stringify(pageData, null, 2));
-
   const response = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
     headers: {
@@ -236,22 +218,17 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
     },
     body: JSON.stringify(pageData)
   });
-
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(`Notion API error: ${errorData.message || response.status}`);
   }
-
   return await response.json();
 }
-
-function convertMarkdownToNotionBlocks(markdown: string) {
-  const blocks: any[] = [];
+function convertMarkdownToNotionBlocks(markdown) {
+  const blocks = [];
   const lines = markdown.split('\n');
-  
-  let currentBlock: any = null;
-  
-  lines.forEach(line => {
+  let currentBlock = null;
+  lines.forEach((line)=>{
     line = line.trim();
     if (!line) {
       if (currentBlock) {
@@ -260,7 +237,6 @@ function convertMarkdownToNotionBlocks(markdown: string) {
       }
       return;
     }
-
     // Handle headers
     if (line.startsWith('##')) {
       if (currentBlock) {
@@ -272,17 +248,20 @@ function convertMarkdownToNotionBlocks(markdown: string) {
         object: 'block',
         type: headerLevel === 2 ? 'heading_2' : 'heading_3',
         [headerLevel === 2 ? 'heading_2' : 'heading_3']: {
-          rich_text: [{
-            type: 'text',
-            text: { content: text }
-          }]
+          rich_text: [
+            {
+              type: 'text',
+              text: {
+                content: text
+              }
+            }
+          ]
         }
       };
       blocks.push(currentBlock);
       currentBlock = null;
       return;
     }
-
     // Handle bullet points
     if (line.startsWith('-')) {
       if (currentBlock) {
@@ -293,47 +272,48 @@ function convertMarkdownToNotionBlocks(markdown: string) {
         object: 'block',
         type: 'bulleted_list_item',
         bulleted_list_item: {
-          rich_text: [{
-            type: 'text',
-            text: { 
-              content: text.replace(/\*\*([^*]+)\*\*/g, '$1'),
-            },
-            annotations: {
-              bold: text.includes('**')
+          rich_text: [
+            {
+              type: 'text',
+              text: {
+                content: text.replace(/\*\*([^*]+)\*\*/g, '$1')
+              },
+              annotations: {
+                bold: text.includes('**')
+              }
             }
-          }]
+          ]
         }
       };
       blocks.push(currentBlock);
       currentBlock = null;
       return;
     }
-
     // Handle regular paragraphs
     if (!currentBlock) {
       currentBlock = {
         object: 'block',
         type: 'paragraph',
         paragraph: {
-          rich_text: [{
-            type: 'text',
-            text: { 
-              content: line.replace(/\*\*([^*]+)\*\*/g, '$1'),
-            },
-            annotations: {
-              bold: line.includes('**')
+          rich_text: [
+            {
+              type: 'text',
+              text: {
+                content: line.replace(/\*\*([^*]+)\*\*/g, '$1')
+              },
+              annotations: {
+                bold: line.includes('**')
+              }
             }
-          }]
+          ]
         }
       };
     } else {
       currentBlock.paragraph.rich_text[0].text.content += '\n' + line;
     }
   });
-
   if (currentBlock) {
     blocks.push(currentBlock);
   }
-
   return blocks;
 }
