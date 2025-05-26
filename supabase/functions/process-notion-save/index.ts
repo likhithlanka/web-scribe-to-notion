@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -93,26 +94,35 @@ async function getNotionTags(notionKey: string, databaseId: string) {
 }
 
 async function processWithOpenAI(apiKey: string, content: any, existingTags: string[]) {
-  const prompt = `Analyze the following webpage content and:
-1. Summarize the main ideas and key points of the page in a concise, markdown-formatted summary. The summary should be clear, well-structured, and capture the essence of the content, using headings, lists, bold, links, etc. as appropriate.
-2. Suggest up to 5 relevant tags from this list of existing tags: [${existingTags.join(', ')}].
-3. If no existing tags are relevant, you can suggest new tags that would be appropriate.
-4. Format the response as JSON:
+  const prompt = `You are an expert content summarizer. Analyze the following webpage and create a comprehensive yet concise summary.
+
+Your task:
+1. **Summarize the content** - Don't extract or copy the original text. Instead, create a well-structured markdown summary that captures the essence, main ideas, key insights, and important details of the webpage.
+
+2. **Provide complete context** - The summary should give readers a full understanding of what the page is about, its purpose, main arguments, and key takeaways.
+
+3. **Use proper markdown formatting** - Include headings (##), bullet points, **bold text** for emphasis, and other markdown elements to make it readable and well-structured.
+
+4. **Keep it concise but comprehensive** - Maximum 200 words, but ensure all important information is captured.
+
+5. **Suggest relevant tags** - Choose up to 5 tags from the existing list: [${existingTags.join(', ')}]. If none fit well, suggest new appropriate tags.
+
+6. **Respond in valid JSON format only**:
 {
-    "SummarizedText": "...", // SummarizedText should be a markdown-formatted summary of the page, not a copy of the original text, but a concise summary.
+    "SummarizedText": "## Main Topic\n\nYour markdown-formatted summary here...",
     "suggestedTags": ["tag1", "tag2", ...]
 }
-5. SummarizedText should simple, precise and give me the complete context. The summarized text should not be more than 200 words
-Webpage content:
-Title: ${content.title}
-URL: ${content.url}
-Domain: ${content.domain}
-Word Count: ${content.wordCount}
-Type: Bookmarks
-Text: ${content.text.substring(0, 4000)}`;
+
+**Webpage to summarize:**
+- Title: ${content.title}
+- URL: ${content.url}
+- Domain: ${content.domain}
+- Original Content: ${content.text.substring(0, 4000)}
+
+Remember: Create a summary that explains WHAT the page is about, WHY it matters, and WHAT the key insights are. Don't just extract or rephrase the original text.`;
 
   try {
-    console.log('Sending request to OpenAI...');
+    console.log('Sending request to OpenAI for summarization...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -120,11 +130,11 @@ Text: ${content.text.substring(0, 4000)}`;
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that summarizes and processes webpage content. Always respond with valid JSON only, no additional text or formatting.'
+            content: 'You are an expert content summarizer. Always respond with valid JSON only. Create concise but comprehensive summaries that give complete context about the content. Use proper markdown formatting for readability.'
           },
           {
             role: 'user',
@@ -132,7 +142,7 @@ Text: ${content.text.substring(0, 4000)}`;
           }
         ],
         max_tokens: 2000,
-        temperature: 0.7
+        temperature: 0.3
       })
     });
     
@@ -147,37 +157,27 @@ Text: ${content.text.substring(0, 4000)}`;
     try {
       const parsedResponse = JSON.parse(aiResponse);
       return {
-        SummarizedText: parsedResponse.SummarizedText || content.text.substring(0, 2000),
+        SummarizedText: parsedResponse.SummarizedText || `## ${content.title}\n\nFailed to generate summary. Please check the content and try again.`,
         suggestedTags: parsedResponse.suggestedTags || []
       };
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
+      console.error('Raw OpenAI response:', aiResponse);
       return {
-        SummarizedText: content.text.substring(0, 2000),
+        SummarizedText: `## ${content.title}\n\nFailed to parse AI summary. Raw content available on the source page.`,
         suggestedTags: []
       };
     }
   } catch (error) {
     console.error('OpenAI processing error:', error);
     return {
-      SummarizedText: content.text.substring(0, 2000),
+      SummarizedText: `## ${content.title}\n\nFailed to process content with AI. Please try again later.`,
       suggestedTags: []
     };
   }
 }
 
 async function saveToNotion(notionKey: string, databaseId: string, data: any) {
-  // Compose a markdown summary with full details about the page
-  const markdownSummary = `# ${data.title || 'Untitled'}
-
-**URL:** [${data.url}](${data.url})
-
-**Tags:** ${data.suggestedTags.join(', ')}
-
-**Summary:**  
-${data.SummarizedText}
-`;
-
   const pageData = {
     parent: {
       database_id: databaseId
@@ -204,11 +204,13 @@ ${data.SummarizedText}
         }
       },
       Type: {
-
+        rich_text: [
+          {
             text: {
               content: "Bookmarks"
             }
-
+          }
+        ]
       }
     },
     children: [
@@ -220,7 +222,7 @@ ${data.SummarizedText}
             {
               type: 'text',
               text: {
-                content: markdownSummary
+                content: data.SummarizedText
               }
             }
           ]
