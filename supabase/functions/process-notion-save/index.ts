@@ -36,7 +36,7 @@ serve(async (req) => {
     const notionResult = await saveToNotion(notionKey, notionDbId, {
       title,
       url,
-      extractedText: aiResult.extractedText,
+      SummarizedText: aiResult.SummarizedText,
       suggestedTags: aiResult.suggestedTags
     });
     console.log('Saved to Notion:', notionResult.id);
@@ -99,7 +99,7 @@ async function processWithOpenAI(apiKey: string, content: any, existingTags: str
 3. If no existing tags are relevant, you can suggest new tags that would be appropriate.
 4. Format the response as JSON:
 {
-    "extractedText": "...", // extractedText should be a markdown-formatted summary of the page, not a copy of the original text, but a concise summary.
+    "SummarizedText": "...", // SummarizedText should be a markdown-formatted summary of the page, not a copy of the original text, but a concise summary.
     "suggestedTags": ["tag1", "tag2", ...]
 }
 
@@ -119,7 +119,7 @@ Text: ${content.text.substring(0, 4000)}`;
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages: [
           {
             role: 'system',
@@ -146,20 +146,20 @@ Text: ${content.text.substring(0, 4000)}`;
     try {
       const parsedResponse = JSON.parse(aiResponse);
       return {
-        extractedText: parsedResponse.extractedText || content.text.substring(0, 2000),
+        SummarizedText: parsedResponse.SummarizedText || content.text.substring(0, 2000),
         suggestedTags: parsedResponse.suggestedTags || []
       };
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
       return {
-        extractedText: content.text.substring(0, 2000),
+        SummarizedText: content.text.substring(0, 2000),
         suggestedTags: []
       };
     }
   } catch (error) {
     console.error('OpenAI processing error:', error);
     return {
-      extractedText: content.text.substring(0, 2000),
+      SummarizedText: content.text.substring(0, 2000),
       suggestedTags: []
     };
   }
@@ -174,7 +174,7 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
 **Tags:** ${data.suggestedTags.join(', ')}
 
 **Summary:**  
-${data.extractedText}
+${data.SummarizedText}
 `;
 
   const pageData = {
