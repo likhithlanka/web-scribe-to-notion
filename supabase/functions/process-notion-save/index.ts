@@ -94,12 +94,12 @@ async function getNotionTags(notionKey: string, databaseId: string) {
 
 async function processWithOpenAI(apiKey: string, content: any, existingTags: string[]) {
   const prompt = `Analyze the following webpage content and:
-1. Extract the main text, removing any unnecessary elements like navigation, ads, headers, footers.
+1. Summarize the main ideas and key points of the page in a concise, markdown-formatted summary. The summary should be clear, well-structured, and capture the essence of the content, using headings, lists, bold, links, etc. as appropriate.
 2. Suggest up to 5 relevant tags from this list of existing tags: [${existingTags.join(', ')}].
 3. If no existing tags are relevant, you can suggest new tags that would be appropriate.
 4. Format the response as JSON:
 {
-    "extractedText": "...", // extractedText should be a markdown-formatted summary of the page, including headings, lists, bold, links, etc., to best represent the content in markdown.
+    "extractedText": "...", // extractedText should be a markdown-formatted summary of the page, not a copy of the original text, but a concise summary.
     "suggestedTags": ["tag1", "tag2", ...]
 }
 
