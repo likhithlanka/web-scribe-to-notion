@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -33,7 +32,7 @@ serve(async (req) => {
     const aiResult = await processWithOpenAI(openaiKey, content, existingTags);
     console.log('AI processing complete:', aiResult);
     
-    // Save to Notion
+    // Save to Notion with properly formatted blocks
     const notionResult = await saveToNotion(notionKey, notionDbId, {
       title,
       url,
@@ -178,6 +177,9 @@ Remember: Create a summary that explains WHAT the page is about, WHY it matters,
 }
 
 async function saveToNotion(notionKey: string, databaseId: string, data: any) {
+  // Convert markdown content into Notion blocks
+  const blocks = convertMarkdownToNotionBlocks(data.SummarizedText);
+
   const pageData = {
     parent: {
       database_id: databaseId
@@ -213,22 +215,7 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
         ]
       }
     },
-    children: [
-      {
-        object: 'block',
-        type: 'paragraph',
-        paragraph: {
-          rich_text: [
-            {
-              type: 'text',
-              text: {
-                content: data.SummarizedText
-              }
-            }
-          ]
-        }
-      }
-    ]
+    children: blocks
   };
 
   console.log('Saving to Notion with data:', JSON.stringify(pageData, null, 2));
@@ -249,4 +236,97 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
   }
 
   return await response.json();
+}
+
+function convertMarkdownToNotionBlocks(markdown: string) {
+  const blocks: any[] = [];
+  const lines = markdown.split('\n');
+  
+  let currentBlock: any = null;
+  
+  lines.forEach(line => {
+    line = line.trim();
+    if (!line) {
+      if (currentBlock) {
+        blocks.push(currentBlock);
+        currentBlock = null;
+      }
+      return;
+    }
+
+    // Handle headers
+    if (line.startsWith('##')) {
+      if (currentBlock) {
+        blocks.push(currentBlock);
+      }
+      const headerLevel = line.match(/^#{2,3}/)?.[0].length || 2;
+      const text = line.replace(/^#{2,3}\s/, '');
+      currentBlock = {
+        object: 'block',
+        type: headerLevel === 2 ? 'heading_2' : 'heading_3',
+        [headerLevel === 2 ? 'heading_2' : 'heading_3']: {
+          rich_text: [{
+            type: 'text',
+            text: { content: text }
+          }]
+        }
+      };
+      blocks.push(currentBlock);
+      currentBlock = null;
+      return;
+    }
+
+    // Handle bullet points
+    if (line.startsWith('-')) {
+      if (currentBlock) {
+        blocks.push(currentBlock);
+      }
+      const text = line.replace(/^-\s/, '');
+      currentBlock = {
+        object: 'block',
+        type: 'bulleted_list_item',
+        bulleted_list_item: {
+          rich_text: [{
+            type: 'text',
+            text: { 
+              content: text.replace(/\*\*([^*]+)\*\*/g, '$1'),
+            },
+            annotations: {
+              bold: text.includes('**')
+            }
+          }]
+        }
+      };
+      blocks.push(currentBlock);
+      currentBlock = null;
+      return;
+    }
+
+    // Handle regular paragraphs
+    if (!currentBlock) {
+      currentBlock = {
+        object: 'block',
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [{
+            type: 'text',
+            text: { 
+              content: line.replace(/\*\*([^*]+)\*\*/g, '$1'),
+            },
+            annotations: {
+              bold: line.includes('**')
+            }
+          }]
+        }
+      };
+    } else {
+      currentBlock.paragraph.rich_text[0].text.content += '\n' + line;
+    }
+  });
+
+  if (currentBlock) {
+    blocks.push(currentBlock);
+  }
+
+  return blocks;
 }
