@@ -102,7 +102,7 @@ async function processWithOpenAI(apiKey: string, content: any, existingTags: str
     "SummarizedText": "...", // SummarizedText should be a markdown-formatted summary of the page, not a copy of the original text, but a concise summary.
     "suggestedTags": ["tag1", "tag2", ...]
 }
-
+5. SummarizedText should simple, precise and give me the complete context.
 Webpage content:
 Title: ${content.title}
 URL: ${content.url}
@@ -131,7 +131,7 @@ Text: ${content.text.substring(0, 4000)}`;
           }
         ],
         max_tokens: 2000,
-        temperature: 0.3
+        temperature: 0.7
       })
     });
     
