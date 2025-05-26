@@ -108,6 +108,7 @@ Title: ${content.title}
 URL: ${content.url}
 Domain: ${content.domain}
 Word Count: ${content.wordCount}
+Type: Bookmarks
 Text: ${content.text.substring(0, 4000)}`;
 
   try {
@@ -203,13 +204,11 @@ ${data.SummarizedText}
         }
       },
       Type: {
-        rich_text: [
-          {
+
             text: {
               content: "Bookmarks"
             }
-          }
-        ]
+
       }
     },
     children: [
