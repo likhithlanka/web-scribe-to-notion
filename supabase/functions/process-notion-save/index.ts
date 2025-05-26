@@ -30,7 +30,8 @@ serve(async (req)=>{
       title,
       url,
       SummarizedText: aiResult.SummarizedText,
-      suggestedTags: aiResult.suggestedTags
+      suggestedTags: aiResult.suggestedTags,
+      MainTag: aiResult.MainTag
     });
     console.log('Saved to Notion:', notionResult.id);
     return new Response(JSON.stringify({
@@ -96,7 +97,7 @@ Your task:
 
 4. **Keep it concise but comprehensive** - Maximum 200 words, but ensure all important information is captured.
 
-5. **Suggest relevant tags** - suggest up to 5 tags from the taking context from these tags [${existingTags.join(', ')}]. 
+5. **Suggest relevant tags** - suggest up to 5 tags from the taking context from the summarized content. 
 
 6. **Main Tag** - Choose the main tag out of the existing list: [${existingTags.join(', ')}]. if none fit well, use miscellaneous as the main tag.
 
@@ -123,7 +124,7 @@ Remember: Create a summary that explains WHAT the page is about, WHY it matters,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages: [
           {
             role: 'system',
@@ -143,12 +144,15 @@ Remember: Create a summary that explains WHAT the page is about, WHY it matters,
       throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    let aiResponse = data.choices[0].message.content;
+    // Remove Markdown code fences if present
+    aiResponse = aiResponse.replace(/^```json[\r\n]+|^```[\r\n]+|```$/gim, '').trim();
     try {
       const parsedResponse = JSON.parse(aiResponse);
       return {
         SummarizedText: parsedResponse.SummarizedText || `## ${content.title}\n\nFailed to generate summary. Please check the content and try again.`,
-        suggestedTags: parsedResponse.suggestedTags || []
+        suggestedTags: parsedResponse.suggestedTags || [],
+        MainTag: parsedResponse.MainTag || 'Miscellaneous'
       };
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
@@ -191,6 +195,11 @@ async function saveToNotion(notionKey, databaseId, data) {
             name: tag
           }))
       },
+      MainTag: {
+        select: {
+          name: data.MainTag
+        }
+      },
       Created: {
         date: {
           start: new Date().toISOString()
@@ -225,9 +234,9 @@ async function saveToNotion(notionKey, databaseId, data) {
   return await response.json();
 }
 function convertMarkdownToNotionBlocks(markdown) {
-  const blocks = [];
+  const blocks: any[] = [];
+  let currentBlock: any = null;
   const lines = markdown.split('\n');
-  let currentBlock = null;
   lines.forEach((line)=>{
     line = line.trim();
     if (!line) {
