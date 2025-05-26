@@ -81,7 +81,7 @@ async function getNotionTags(notionKey: string, databaseId: string) {
     
     const database = await response.json();
     
-    const tagsProperty = database.properties.Tags;
+    const tagsProperty = database.properties.MainTag;
     if (tagsProperty && tagsProperty.type === 'multi_select') {
       return tagsProperty.multi_select.options.map((option: any) => option.name);
     }
