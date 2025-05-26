@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -95,12 +94,12 @@ async function getNotionTags(notionKey: string, databaseId: string) {
 
 async function processWithOpenAI(apiKey: string, content: any, existingTags: string[]) {
   const prompt = `Analyze the following webpage content and:
-1. Extract the main text, removing any unnecessary elements like navigation, ads, headers, footers
-2. Suggest up to 5 relevant tags from this list of existing tags: [${existingTags.join(', ')}]
-3. If no existing tags are relevant, you can suggest new tags that would be appropriate
+1. Extract the main text, removing any unnecessary elements like navigation, ads, headers, footers.
+2. Suggest up to 5 relevant tags from this list of existing tags: [${existingTags.join(', ')}].
+3. If no existing tags are relevant, you can suggest new tags that would be appropriate.
 4. Format the response as JSON:
 {
-    "extractedText": "...",
+    "extractedText": "...", // extractedText should be a markdown-formatted summary of the page, including headings, lists, bold, links, etc., to best represent the content in markdown.
     "suggestedTags": ["tag1", "tag2", ...]
 }
 
@@ -167,6 +166,17 @@ Text: ${content.text.substring(0, 4000)}`;
 }
 
 async function saveToNotion(notionKey: string, databaseId: string, data: any) {
+  // Compose a markdown summary with full details about the page
+  const markdownSummary = `# ${data.title || 'Untitled'}
+
+**URL:** [${data.url}](${data.url})
+
+**Tags:** ${data.suggestedTags.join(', ')}
+
+**Summary:**  
+${data.extractedText}
+`;
+
   const pageData = {
     parent: {
       database_id: databaseId
@@ -191,6 +201,15 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
         date: {
           start: new Date().toISOString()
         }
+      },
+      Type: {
+        rich_text: [
+          {
+            text: {
+              content: "Bookmarks"
+            }
+          }
+        ]
       }
     },
     children: [
@@ -202,7 +221,7 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
             {
               type: 'text',
               text: {
-                content: data.extractedText.substring(0, 2000)
+                content: markdownSummary
               }
             }
           ]
@@ -210,9 +229,9 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
       }
     ]
   };
-  
+
   console.log('Saving to Notion with data:', JSON.stringify(pageData, null, 2));
-  
+
   const response = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
     headers: {
@@ -222,11 +241,11 @@ async function saveToNotion(notionKey: string, databaseId: string, data: any) {
     },
     body: JSON.stringify(pageData)
   });
-  
+
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(`Notion API error: ${errorData.message || response.status}`);
   }
-  
+
   return await response.json();
 }
