@@ -102,7 +102,7 @@ async function processWithOpenAI(apiKey: string, content: any, existingTags: str
     "SummarizedText": "...", // SummarizedText should be a markdown-formatted summary of the page, not a copy of the original text, but a concise summary.
     "suggestedTags": ["tag1", "tag2", ...]
 }
-5. SummarizedText should simple, precise and give me the complete context.
+5. SummarizedText should simple, precise and give me the complete context. The summarized text should not be more than 200 words
 Webpage content:
 Title: ${content.title}
 URL: ${content.url}
@@ -123,7 +123,7 @@ Text: ${content.text.substring(0, 4000)}`;
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that extracts and processes webpage content. Always respond with valid JSON only, no additional text or formatting.'
+            content: 'You are a helpful assistant that summarizes and processes webpage content. Always respond with valid JSON only, no additional text or formatting.'
           },
           {
             role: 'user',
