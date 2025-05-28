@@ -21,9 +21,10 @@ serve(async (req)=>{
     console.log('Processing content for user:', user.email);
     // Get existing tags from Notion database
     const existingTags = await getNotionTags(notionKey, notionDbId);
+    const existingTags2 = await getNotionTags2(notionKey, notionDbId);
     console.log('Found existing tags:', existingTags);
     // Process content with OpenAI
-    const aiResult = await processWithOpenAI(openaiKey, content, existingTags);
+    const aiResult = await processWithOpenAI(openaiKey, content, existingTags, existingTags2);
     console.log('AI processing complete:', aiResult);
     // Save to Notion with properly formatted blocks
     const notionResult = await saveToNotion(notionKey, notionDbId, {
@@ -81,11 +82,37 @@ async function getNotionTags(notionKey, databaseId) {
     }
     return [];
   } catch (error) {
+    console.error('Error getting Notion Maintags:', error);
+    return [];
+  }
+}
+async function getNotionTags2(notionKey, databaseId) {
+  try {
+    console.log('Getting tags from Notion database:', databaseId);
+    const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${notionKey}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Notion API error: ${response.status} - ${errorText}`);
+    }
+    const database = await response.json();
+    const tagsProperty = database.properties.Tags;
+    if (tagsProperty && tagsProperty.type === 'multi_select') {
+      return tagsProperty.multi_select.options.map((option)=>option.name);
+    }
+    return [];
+  } catch (error) {
     console.error('Error getting Notion tags:', error);
     return [];
   }
 }
-async function processWithOpenAI(apiKey, content, existingTags) {
+async function processWithOpenAI(apiKey, content, existingTags,existingTags2) {
   const prompt = `You are an expert content summarizer. Analyze the following webpage and create a comprehensive yet concise summary.
 
 Your task:
@@ -97,7 +124,7 @@ Your task:
 
 4. **Keep it concise but comprehensive** - Maximum 200 words, but ensure all important information is captured.
 
-5. **Suggest relevant tags** - suggest up to 5 tags from the taking context from the summarized content. 
+5. **Suggest relevant tags** - suggest up to 5 tags from the taking context from the summarized content. if any of them match the following existing tags  [${existingTags2.join(', ')}] then replace the matching tags. 
 
 6. **Main Tag** - Choose the main tag out of the existing list: [${existingTags.join(', ')}]. if none fit well, use miscellaneous as the main tag.
 
