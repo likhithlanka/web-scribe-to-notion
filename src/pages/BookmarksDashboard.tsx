@@ -1,4 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { format } from "date-fns";
+import ReactWordcloud from 'react-wordcloud';
+import CalendarHeatmap from 'react-calendar-heatmap';
+import 'react-calendar-heatmap/dist/styles.css';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,12 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { StatsCard } from "@/components/StatsCard";
+import { KnowledgeGraph } from "@/components/KnowledgeGraph";
 
-// Utility to fetch Notion data from your Supabase Edge Function
 async function fetchNotionArticles() {
   try {
     const apiUrl = `${supabase.supabaseUrl}/functions/v1/list-notion-bookmarks`;
@@ -38,9 +42,9 @@ async function fetchNotionArticles() {
 export default function BookmarksDashboard() {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [date, setDate] = useState<Date>();
+  const [date, setDate] = useState();
   const [selectedTag, setSelectedTag] = useState(null);
   const [selectedMainTag, setSelectedMainTag] = useState(null);
 
@@ -72,55 +76,71 @@ export default function BookmarksDashboard() {
     });
   }, [articles, search, date, selectedTag, selectedMainTag]);
 
-  const tagData = useMemo(() => {
+  const wordCloudData = useMemo(() => {
     const counts = {};
     articles.forEach(article => {
       (article.tags || []).forEach(tag => {
         counts[tag] = (counts[tag] || 0) + 1;
       });
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+    return Object.entries(counts).map(([text, value]) => ({ text, value }));
   }, [articles]);
 
-  const mainTagData = useMemo(() => {
-    const counts = {};
-    articles.forEach(article => {
-      if (article.mainTag) {
-        counts[article.mainTag] = (counts[article.mainTag] || 0) + 1;
-      }
-    });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [articles]);
-
-  const timeSeriesData = useMemo(() => {
+  const heatmapData = useMemo(() => {
     const data = {};
-    const mainTags = new Set(articles.map(article => article.mainTag).filter(Boolean));
-    
     articles.forEach(article => {
       const date = format(new Date(article.created), 'yyyy-MM-dd');
-      if (!data[date]) {
-        data[date] = {
-          date,
-          ...Array.from(mainTags).reduce((acc, tag) => ({ ...acc, [tag]: 0 }), {})
-        };
-      }
-      if (article.mainTag) {
-        data[date][article.mainTag] = (data[date][article.mainTag] || 0) + 1;
-      }
+      data[date] = (data[date] || 0) + 1;
     });
-
-    return Object.values(data).sort((a: any, b: any) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    return Object.entries(data).map(([date, count]) => ({ date, count }));
   }, [articles]);
 
-  const mainTagColors = {
-    'Product': '#8884d8',
-    'Technology': '#82ca9d',
-    'Design': '#ffc658',
-    'Business': '#ff7300',
-    'Miscellaneous': '#666'
-  };
+  const knowledgeGraphData = useMemo(() => {
+    const nodes = [];
+    const links = [];
+    const tagMap = new Map();
+
+    // Create nodes for each tag
+    articles.forEach(article => {
+      article.tags.forEach(tag => {
+        if (!tagMap.has(tag)) {
+          tagMap.set(tag, {
+            id: tag,
+            name: tag,
+            val: 1
+          });
+        } else {
+          tagMap.get(tag).val++;
+        }
+      });
+
+      // Create links between tags that appear together
+      article.tags.forEach((tag1, i) => {
+        article.tags.slice(i + 1).forEach(tag2 => {
+          links.push({
+            source: tag1,
+            target: tag2,
+            value: 1
+          });
+        });
+      });
+    });
+
+    return {
+      nodes: Array.from(tagMap.values()),
+      links
+    };
+  }, [articles]);
+
+  const stats = useMemo(() => ({
+    totalArticles: articles.length,
+    uniqueTags: new Set(articles.flatMap(a => a.tags)).size,
+    avgTagsPerArticle: articles.reduce((acc, curr) => acc + curr.tags.length, 0) / articles.length || 0,
+    mostUsedTag: Object.entries(
+      articles.flatMap(a => a.tags)
+        .reduce((acc, tag) => ({ ...acc, [tag]: (acc[tag] || 0) + 1 }), {})
+    ).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'
+  }), [articles]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -129,8 +149,28 @@ export default function BookmarksDashboard() {
           Error: {error}
         </div>
       )}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Bookmarks Dashboard</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <StatsCard
+          title="Total Articles"
+          value={stats.totalArticles}
+        />
+        <StatsCard
+          title="Unique Tags"
+          value={stats.uniqueTags}
+        />
+        <StatsCard
+          title="Avg Tags/Article"
+          value={stats.avgTagsPerArticle.toFixed(1)}
+        />
+        <StatsCard
+          title="Most Used Tag"
+          value={stats.mostUsedTag}
+        />
+      </div>
+
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Knowledge Dashboard</h1>
         <div className="flex gap-4">
           <Input
             placeholder="Search bookmarks..."
@@ -166,68 +206,48 @@ export default function BookmarksDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Tag Distribution</CardTitle>
+            <CardTitle>Tag Cloud</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={tagData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
+            <div style={{ height: '300px' }}>
+              <ReactWordcloud
+                words={wordCloudData}
+                options={{
+                  fontSizes: [12, 32],
+                  rotations: 0,
+                  fontFamily: 'Inter',
+                  colors: ['#8884d8', '#82ca9d', '#ffc658', '#ff7300'],
+                }}
+              />
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Main Tag Distribution</CardTitle>
+            <CardTitle>Reading Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mainTagData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
+              <CalendarHeatmap
+                startDate={new Date(new Date().setFullYear(new Date().getFullYear() - 1))}
+                endDate={new Date()}
+                values={heatmapData}
+                classForValue={(value) => {
+                  if (!value) return 'color-empty';
+                  return `color-scale-${Math.min(value.count, 4)}`;
+                }}
+              />
             </div>
           </CardContent>
         </Card>
 
         <Card className="col-span-1 md:col-span-2">
           <CardHeader>
-            <CardTitle>Reading Trends</CardTitle>
+            <CardTitle>Knowledge Graph</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timeSeriesData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  {Object.keys(mainTagColors).map(tag => (
-                    <Line
-                      key={tag}
-                      type="monotone"
-                      dataKey={tag}
-                      stroke={mainTagColors[tag]}
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            <KnowledgeGraph data={knowledgeGraphData} />
           </CardContent>
         </Card>
       </div>
