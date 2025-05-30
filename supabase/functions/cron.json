@@ -3,6 +3,10 @@
     {
       "name": "list-notion-bookmarks",
       "schedule": "0 0 * * *"
+    },
+    {
+      "name": "generate-insights",
+      "schedule": "0 1 * * *"
     }
   ]
 }
