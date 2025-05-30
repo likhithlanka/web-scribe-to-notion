@@ -1,0 +1,8 @@
+{
+  "functions": [
+    {
+      "name": "list-notion-bookmarks",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
