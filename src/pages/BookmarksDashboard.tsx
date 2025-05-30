@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { format } from "date-fns";
+import { format, parseISO, subMonths } from "date-fns";
 import CalendarHeatmap from 'react-calendar-heatmap';
 import 'react-calendar-heatmap/dist/styles.css';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,31 +14,39 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { StatsCard } from "@/components/StatsCard";
 import { KnowledgeGraph } from "@/components/KnowledgeGraph";
+import { TagDistributionChart } from "@/components/TagDistributionChart";
+import { TimeSeriesChart } from "@/components/TimeSeriesChart";
 
-async function fetchNotionArticles() {
-  try {
-    const apiUrl = `${supabase.supabaseUrl}/functions/v1/list-notion-bookmarks`;
-    const res = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${supabase.supabaseKey}`,
-        'Content-Type': 'application/json'
-      },
-    });
-    
-    if (!res.ok) {
-      const error = await res.text();
-      throw new Error(error || 'Failed to fetch Notion articles');
-    }
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return data.articles || [];
-  } catch (err) {
-    throw err;
-  }
+async function fetchBookmarksData() {
+  const { data: bookmarks, error: bookmarksError } = await supabase
+    .from('bookmarks')
+    .select(`
+      id,
+      title,
+      url,
+      created_at,
+      main_tags (
+        name
+      ),
+      bookmark_tags (
+        tags (
+          name
+        )
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (bookmarksError) throw bookmarksError;
+
+  return bookmarks.map(bookmark => ({
+    ...bookmark,
+    mainTag: bookmark.main_tags?.name || 'Miscellaneous',
+    tags: bookmark.bookmark_tags.map(bt => bt.tags.name)
+  }));
 }
 
 export default function BookmarksDashboard() {
-  const [articles, setArticles] = useState([]);
+  const [bookmarks, setBookmarks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
@@ -48,88 +55,56 @@ export default function BookmarksDashboard() {
   const [selectedMainTag, setSelectedMainTag] = useState(null);
 
   useEffect(() => {
-    fetchNotionArticles()
+    fetchBookmarksData()
       .then(data => {
-        setArticles(data);
+        setBookmarks(data);
         setLoading(false);
       })
       .catch(err => {
-        setError(err.message || 'Failed to load data');
+        setError(err.message);
         setLoading(false);
       });
   }, []);
 
   const filteredArticles = useMemo(() => {
-    return articles.filter(article => {
+    return bookmarks.filter(bookmark => {
       const matchesSearch =
-        article.title.toLowerCase().includes(search.toLowerCase()) ||
-        article.content.toLowerCase().includes(search.toLowerCase()) ||
-        (article.tags || []).some(tag => tag.toLowerCase().includes(search.toLowerCase())) ||
-        (article.mainTag || '').toLowerCase().includes(search.toLowerCase());
+        bookmark.title.toLowerCase().includes(search.toLowerCase()) ||
+        bookmark.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase())) ||
+        bookmark.mainTag.toLowerCase().includes(search.toLowerCase());
       
-      const matchesDate = !date || format(new Date(article.created), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
-      const matchesTag = !selectedTag || (article.tags || []).includes(selectedTag);
-      const matchesMainTag = !selectedMainTag || article.mainTag === selectedMainTag;
+      const matchesDate = !date || format(parseISO(bookmark.created_at), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+      const matchesTag = !selectedTag || bookmark.tags.includes(selectedTag);
+      const matchesMainTag = !selectedMainTag || bookmark.mainTag === selectedMainTag;
       
       return matchesSearch && matchesDate && matchesTag && matchesMainTag;
     });
-  }, [articles, search, date, selectedTag, selectedMainTag]);
+  }, [bookmarks, search, date, selectedTag, selectedMainTag]);
 
-  const heatmapData = useMemo(() => {
-    const data = {};
-    articles.forEach(article => {
-      const date = format(new Date(article.created), 'yyyy-MM-dd');
-      data[date] = (data[date] || 0) + 1;
-    });
-    return Object.entries(data).map(([date, count]) => ({ date, count }));
-  }, [articles]);
-
-  const knowledgeGraphData = useMemo(() => {
-    const nodes = [];
-    const links = [];
-    const tagMap = new Map();
-
-    // Create nodes for each tag
-    articles.forEach(article => {
-      article.tags.forEach(tag => {
-        if (!tagMap.has(tag)) {
-          tagMap.set(tag, {
-            id: tag,
-            name: tag,
-            val: 1
-          });
-        } else {
-          tagMap.get(tag).val++;
-        }
-      });
-
-      // Create links between tags that appear together
-      article.tags.forEach((tag1, i) => {
-        article.tags.slice(i + 1).forEach(tag2 => {
-          links.push({
-            source: tag1,
-            target: tag2,
-            value: 1
-          });
-        });
+  const tagDistribution = useMemo(() => {
+    const counts = {};
+    bookmarks.forEach(bookmark => {
+      bookmark.tags.forEach(tag => {
+        counts[tag] = (counts[tag] || 0) + 1;
       });
     });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [bookmarks]);
 
-    return {
-      nodes: Array.from(tagMap.values()),
-      links
-    };
-  }, [articles]);
-
-  const stats = useMemo(() => ({
-    totalArticles: articles.length,
-    uniqueTags: new Set(articles.flatMap(a => a.tags)).size,
-    avgTagsPerArticle: articles.reduce((acc, curr) => acc + curr.tags.length, 0) / articles.length || 0,
-    mostUsedTag: Object.entries(
-      articles.flatMap(a => a.tags)
-        .reduce((acc, tag) => ({ ...acc, [tag]: (acc[tag] || 0) + 1 }), {})
-    ).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'
-  }), [articles]);
+  const timeSeriesData = useMemo(() => {
+    const counts = {};
+    bookmarks.forEach(bookmark => {
+      const date = format(parseISO(bookmark.created_at), 'yyyy-MM-dd');
+      counts[date] = (counts[date] || 0) + 1;
+    });
+    
+    return Object.entries(counts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [bookmarks]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -138,28 +113,9 @@ export default function BookmarksDashboard() {
           Error: {error}
         </div>
       )}
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatsCard
-          title="Total Articles"
-          value={stats.totalArticles}
-        />
-        <StatsCard
-          title="Unique Tags"
-          value={stats.uniqueTags}
-        />
-        <StatsCard
-          title="Avg Tags/Article"
-          value={stats.avgTagsPerArticle.toFixed(1)}
-        />
-        <StatsCard
-          title="Most Used Tag"
-          value={stats.mostUsedTag}
-        />
-      </div>
 
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Knowledge Dashboard</h1>
+        <h1 className="text-3xl font-bold">Bookmarks Dashboard</h1>
         <div className="flex gap-4">
           <Input
             placeholder="Search bookmarks..."
@@ -191,33 +147,40 @@ export default function BookmarksDashboard() {
           </Popover>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Reading Activity</CardTitle>
+            <CardTitle>Tag Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <CalendarHeatmap
-                startDate={new Date(new Date().setFullYear(new Date().getFullYear() - 1))}
-                endDate={new Date()}
-                values={heatmapData}
-                classForValue={(value) => {
-                  if (!value) return 'color-empty';
-                  return `color-scale-${Math.min(value.count, 4)}`;
-                }}
-              />
-            </div>
+            <TagDistributionChart data={tagDistribution} />
           </CardContent>
         </Card>
 
-        <Card className="col-span-1 md:col-span-2">
+        <Card>
           <CardHeader>
-            <CardTitle>Knowledge Graph</CardTitle>
+            <CardTitle>Bookmarks Over Time</CardTitle>
           </CardHeader>
           <CardContent>
-            <KnowledgeGraph data={knowledgeGraphData} />
+            <TimeSeriesChart data={timeSeriesData} />
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-2">
+          <CardHeader>
+            <CardTitle>Activity Heatmap</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CalendarHeatmap
+              startDate={subMonths(new Date(), 12)}
+              endDate={new Date()}
+              values={timeSeriesData}
+              classForValue={(value) => {
+                if (!value) return 'color-empty';
+                return `color-scale-${Math.min(value.count, 4)}`;
+              }}
+            />
           </CardContent>
         </Card>
       </div>
@@ -241,30 +204,30 @@ export default function BookmarksDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredArticles.map((article) => (
-                  <TableRow key={article.notionUrl}>
+                {filteredArticles.map((bookmark) => (
+                  <TableRow key={bookmark.id}>
                     <TableCell>
                       <a
-                        href={article.url}
+                        href={bookmark.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:underline"
                       >
-                        {article.title}
+                        {bookmark.title}
                       </a>
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant="secondary"
                         className="cursor-pointer"
-                        onClick={() => setSelectedMainTag(article.mainTag)}
+                        onClick={() => setSelectedMainTag(bookmark.mainTag)}
                       >
-                        {article.mainTag}
+                        {bookmark.mainTag}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 flex-wrap">
-                        {article.tags.map((tag) => (
+                        {bookmark.tags.map((tag) => (
                           <Badge
                             key={tag}
                             variant="outline"
@@ -277,7 +240,7 @@ export default function BookmarksDashboard() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {format(new Date(article.created), 'PPP')}
+                      {format(parseISO(bookmark.created_at), 'PPP')}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -286,11 +249,11 @@ export default function BookmarksDashboard() {
                         asChild
                       >
                         <a
-                          href={article.notionUrl}
+                          href={bookmark.url}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          Open in Notion
+                          Open Link
                         </a>
                       </Button>
                     </TableCell>

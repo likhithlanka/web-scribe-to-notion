@@ -10,7 +10,7 @@ interface TimeSeriesChartProps {
 
 export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%\" height={300}>
       <LineChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis 
