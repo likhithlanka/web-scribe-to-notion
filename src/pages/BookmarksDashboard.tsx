@@ -19,6 +19,7 @@ async function fetchNotionArticles() {
     const res = await fetch(apiUrl, {
       headers: {
         'Authorization': `Bearer ${supabase.supabaseKey}`,
+        'Content-Type': 'application/json'
       },
     });
     
