@@ -12,6 +12,34 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
   await supabaseClient.from('bookmark_tags').delete().neq('bookmark_id', null);
   await supabaseClient.from('bookmarks').delete().neq('id', null);
   
+  // First, fetch main tags from Notion database properties
+  const dbResponse = await fetch(`https://api.notion.com/v1/databases/${notionDbId}`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${notionKey}`,
+      "Notion-Version": "2022-06-28"
+    }
+  });
+
+  if (!dbResponse.ok) {
+    throw new Error(`Failed to fetch Notion database: ${dbResponse.status}`);
+  }
+
+  const dbData = await dbResponse.json();
+  const mainTagOptions = dbData.properties.MainTag?.select?.options || [];
+
+  // Sync main tags first
+  for (const mainTag of mainTagOptions) {
+    await supabaseClient
+      .from('main_tags')
+      .upsert({ 
+        name: mainTag.name,
+        updated_at: new Date().toISOString()
+      }, { 
+        onConflict: 'name'
+      });
+  }
+
   // Fetch pages from Notion database
   const response = await fetch(`https://api.notion.com/v1/databases/${notionDbId}/query`, {
     method: "POST",
@@ -40,6 +68,9 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
   
   // Process each bookmark
   for (const page of data.results) {
+    // Get the correct creation time
+    const createdTime = page.properties.Created?.date?.start || page.created_time;
+    
     const bookmark = {
       title: page.properties.Name?.title?.[0]?.plain_text || "",
       url: page.properties.URL?.url || "",
@@ -47,28 +78,39 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
       tags: page.properties.Tags?.multi_select?.map((t: any) => t.name) || [],
       summarized_text: page.properties.SummarizedText?.rich_text?.[0]?.plain_text || "",
       type: "article",
-      created_at: page.properties.Created?.date?.start || page.created_time
+      created_at: createdTime,
+      updated_at: page.last_edited_time
     };
 
-    // 1. Get or create main tag
+    // Get main tag ID
     const { data: mainTagData } = await supabaseClient
       .from('main_tags')
       .select('id')
       .eq('name', bookmark.main_tag)
       .single();
 
-    const mainTagId = mainTagData?.id;
+    if (!mainTagData) {
+      console.warn(`Main tag "${bookmark.main_tag}" not found, using Miscellaneous`);
+      const { data: miscTag } = await supabaseClient
+        .from('main_tags')
+        .select('id')
+        .eq('name', 'Miscellaneous')
+        .single();
+      bookmark.main_tag = 'Miscellaneous';
+      mainTagData = miscTag;
+    }
 
-    // 2. Insert bookmark
+    // Insert bookmark with correct timestamps
     const { data: bookmarkData, error: bookmarkError } = await supabaseClient
       .from('bookmarks')
       .insert({
         title: bookmark.title,
         url: bookmark.url,
-        main_tag_id: mainTagId,
+        main_tag_id: mainTagData.id,
         type: bookmark.type,
         summarized_text: bookmark.summarized_text,
-        created_at: bookmark.created_at
+        created_at: bookmark.created_at,
+        updated_at: bookmark.updated_at
       })
       .select('id')
       .single();
@@ -78,7 +120,7 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
       continue;
     }
 
-    // 3. Process tags
+    // Process tags
     for (const tagName of bookmark.tags) {
       // Get or create tag
       const { data: tagData } = await supabaseClient
@@ -104,7 +146,8 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
           .from('bookmark_tags')
           .insert({
             bookmark_id: bookmarkData.id,
-            tag_id: tagId
+            tag_id: tagId,
+            created_at: bookmark.created_at // Use the same creation time
           });
       }
     }
