@@ -1,8 +1,8 @@
 import React from 'react';
-import BookmarksDashboardWordCloud from './BookmarksDashboardWordCloud';
+import BookmarksDashboard from './BookmarksDashboard';
 
 const Index = () => {
-  return <BookmarksDashboardWordCloud />;
+  return <BookmarksDashboard />;
 };
 
 export default Index;
