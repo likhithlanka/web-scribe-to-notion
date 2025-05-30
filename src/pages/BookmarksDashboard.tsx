@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { format } from "date-fns";
-import ReactWordcloud from 'react-wordcloud';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import 'react-calendar-heatmap/dist/styles.css';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Legend, ResponsiveContainer } from 'recharts';
@@ -75,16 +74,6 @@ export default function BookmarksDashboard() {
       return matchesSearch && matchesDate && matchesTag && matchesMainTag;
     });
   }, [articles, search, date, selectedTag, selectedMainTag]);
-
-  const wordCloudData = useMemo(() => {
-    const counts = {};
-    articles.forEach(article => {
-      (article.tags || []).forEach(tag => {
-        counts[tag] = (counts[tag] || 0) + 1;
-      });
-    });
-    return Object.entries(counts).map(([text, value]) => ({ text, value }));
-  }, [articles]);
 
   const heatmapData = useMemo(() => {
     const data = {};
@@ -204,25 +193,6 @@ export default function BookmarksDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tag Cloud</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div style={{ height: '300px' }}>
-              <ReactWordcloud
-                words={wordCloudData}
-                options={{
-                  fontSizes: [12, 32],
-                  rotations: 0,
-                  fontFamily: 'Inter',
-                  colors: ['#8884d8', '#82ca9d', '#ffc658', '#ff7300'],
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <CardTitle>Reading Activity</CardTitle>
