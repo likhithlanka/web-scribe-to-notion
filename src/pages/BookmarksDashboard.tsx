@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { format, parseISO, subMonths } from "date-fns";
 import CalendarHeatmap from 'react-calendar-heatmap';
 import 'react-calendar-heatmap/dist/styles.css';
@@ -114,9 +115,12 @@ export default function BookmarksDashboard() {
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Bookmarks Dashboard</h1>
         <div className="flex gap-4">
+          <Button asChild variant="outline">
+            <Link to="/insights">View Learning Insights</Link>
+          </Button>
           <Input
             placeholder="Search bookmarks..."
             value={search}
