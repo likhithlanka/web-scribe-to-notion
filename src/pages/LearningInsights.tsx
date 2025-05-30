@@ -118,7 +118,7 @@ export default function LearningInsights() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Your Learning Profile</CardTitle>
+          <CardTitle>Likhith's Learning Profile</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
