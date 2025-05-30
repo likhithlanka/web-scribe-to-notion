@@ -19,7 +19,7 @@ serve(async (req) => {
       throw new Error("Missing Notion API keys.");
     }
 
-    // Fetch all pages from Notion database
+    // Fetch pages from Notion database with Type = Bookmarks filter
     const response = await fetch("https://api.notion.com/v1/databases/" + notionDbId + "/query", {
       method: "POST",
       headers: {
@@ -27,7 +27,15 @@ serve(async (req) => {
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ page_size: 100 })
+      body: JSON.stringify({
+        page_size: 100,
+        filter: {
+          property: "Type",
+          rich_text: {
+            equals: "Bookmarks"
+          }
+        }
+      })
     });
 
     if (!response.ok) {
