@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Bar, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +31,6 @@ async function fetchNotionArticles() {
     if (data.error) throw new Error(data.error);
     return data.articles || [];
   } catch (err) {
-    // Return empty array and let UI show error
     throw err;
   }
 }
@@ -57,7 +56,6 @@ export default function BookmarksDashboard() {
       });
   }, []);
 
-  // Filtered articles by search, date, and tag/mainTag
   const filteredArticles = useMemo(() => {
     return articles.filter(article => {
       const matchesSearch =
@@ -74,7 +72,6 @@ export default function BookmarksDashboard() {
     });
   }, [articles, search, date, selectedTag, selectedMainTag]);
 
-  // Tag frequency for bar chart
   const tagData = useMemo(() => {
     const counts = {};
     articles.forEach(article => {
@@ -85,7 +82,6 @@ export default function BookmarksDashboard() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [articles]);
 
-  // MainTag frequency for bar chart
   const mainTagData = useMemo(() => {
     const counts = {};
     articles.forEach(article => {
@@ -96,20 +92,35 @@ export default function BookmarksDashboard() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [articles]);
 
-  // Time series data
   const timeSeriesData = useMemo(() => {
-    const data: Record<string, Record<string, number> & { date: string }> = {};
+    const data = {};
+    const mainTags = new Set(articles.map(article => article.mainTag).filter(Boolean));
+    
     articles.forEach(article => {
       const date = format(new Date(article.created), 'yyyy-MM-dd');
       if (!data[date]) {
-        data[date] = { date };
+        data[date] = {
+          date,
+          ...Array.from(mainTags).reduce((acc, tag) => ({ ...acc, [tag]: 0 }), {})
+        };
       }
       if (article.mainTag) {
         data[date][article.mainTag] = (data[date][article.mainTag] || 0) + 1;
       }
     });
-    return Object.values(data).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return Object.values(data).sort((a: any, b: any) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
   }, [articles]);
+
+  const mainTagColors = {
+    'Product': '#8884d8',
+    'Technology': '#82ca9d',
+    'Design': '#ffc658',
+    'Business': '#ff7300',
+    'Miscellaneous': '#666'
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -159,19 +170,15 @@ export default function BookmarksDashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <Bar
-                data={tagData}
-                width={500}
-                height={300}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                {/* Add Bar chart components here */}
-              </Bar>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={tagData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
@@ -182,19 +189,15 @@ export default function BookmarksDashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <Bar
-                data={mainTagData}
-                width={500}
-                height={300}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                {/* Add Bar chart components here */}
-              </Bar>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mainTagData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#82ca9d" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
@@ -205,19 +208,25 @@ export default function BookmarksDashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <Line
-                data={timeSeriesData}
-                width={1000}
-                height={300}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                {/* Add Line chart components here */}
-              </Line>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  {Object.keys(mainTagColors).map(tag => (
+                    <Line
+                      key={tag}
+                      type="monotone"
+                      dataKey={tag}
+                      stroke={mainTagColors[tag]}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
@@ -228,7 +237,6 @@ export default function BookmarksDashboard() {
           <CardTitle>Bookmarks</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Show loading state */}
           {loading ? (
             <div className="text-center text-gray-500">Loading bookmarks...</div>
           ) : (
