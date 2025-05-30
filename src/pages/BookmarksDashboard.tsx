@@ -11,26 +11,42 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Utility to fetch Notion data from your own API endpoint
+// Utility to fetch Notion data from your Supabase Edge Function
 async function fetchNotionArticles() {
-  const res = await fetch('/api/notion-articles');
-  if (!res.ok) throw new Error('Failed to fetch Notion articles');
-  return res.json();
+  try {
+    const res = await fetch('https://ypkfdgvuipvfhktqqmpr.functions.supabase.co/list-notion-bookmarks');
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(error || 'Failed to fetch Notion articles');
+    }
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.articles || [];
+  } catch (err) {
+    // Return empty array and let UI show error
+    throw err;
+  }
 }
 
 export default function BookmarksDashboard() {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [date, setDate] = useState<Date>();
   const [selectedTag, setSelectedTag] = useState(null);
   const [selectedMainTag, setSelectedMainTag] = useState(null);
 
   useEffect(() => {
-    fetchNotionArticles().then(data => {
-      setArticles(data);
-      setLoading(false);
-    });
+    fetchNotionArticles()
+      .then(data => {
+        setArticles(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message || 'Failed to load data');
+        setLoading(false);
+      });
   }, []);
 
   // Filtered articles by search, date, and tag/mainTag
@@ -74,7 +90,7 @@ export default function BookmarksDashboard() {
 
   // Time series data
   const timeSeriesData = useMemo(() => {
-    const data = {};
+    const data: Record<string, Record<string, number> & { date: string }> = {};
     articles.forEach(article => {
       const date = format(new Date(article.created), 'yyyy-MM-dd');
       if (!data[date]) {
@@ -84,11 +100,16 @@ export default function BookmarksDashboard() {
         data[date][article.mainTag] = (data[date][article.mainTag] || 0) + 1;
       }
     });
-    return Object.values(data).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return Object.values(data).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [articles]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-4 border border-red-200">
+          Error: {error}
+        </div>
+      )}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Bookmarks Dashboard</h1>
         <div className="flex gap-4">
@@ -199,74 +220,79 @@ export default function BookmarksDashboard() {
           <CardTitle>Bookmarks</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Main Tag</TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredArticles.map((article) => (
-                <TableRow key={article.notionUrl}>
-                  <TableCell>
-                    <a
-                      href={article.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      {article.title}
-                    </a>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer"
-                      onClick={() => setSelectedMainTag(article.mainTag)}
-                    >
-                      {article.mainTag}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1 flex-wrap">
-                      {article.tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="outline"
-                          className="cursor-pointer"
-                          onClick={() => setSelectedTag(tag)}
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {format(new Date(article.created), 'PPP')}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                    >
+          {/* Show loading state */}
+          {loading ? (
+            <div className="text-center text-gray-500">Loading bookmarks...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Main Tag</TableHead>
+                  <TableHead>Tags</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredArticles.map((article) => (
+                  <TableRow key={article.notionUrl}>
+                    <TableCell>
                       <a
-                        href={article.notionUrl}
+                        href={article.url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
                       >
-                        Open in Notion
+                        {article.title}
                       </a>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className="cursor-pointer"
+                        onClick={() => setSelectedMainTag(article.mainTag)}
+                      >
+                        {article.mainTag}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {article.tags.map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="outline"
+                            className="cursor-pointer"
+                            onClick={() => setSelectedTag(tag)}
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(article.created), 'PPP')}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                      >
+                        <a
+                          href={article.notionUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open in Notion
+                        </a>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
