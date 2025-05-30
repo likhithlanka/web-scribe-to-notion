@@ -4,20 +4,29 @@ import { supabase } from "@/integrations/supabase/client";
 
 export default function LearningInsights() {
   const [insights, setInsights] = useState<string>('');
+  const [generatedAt, setGeneratedAt] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchInsights() {
       try {
-        const { data, error } = await supabase
-          .from('learning_insights')
-          .select('content, generated_at')
-          .eq('id', 'latest')
-          .single();
+        const response = await fetch(`${supabase.supabaseUrl}/functions/v1/get-learning-insights`, {
+          headers: {
+            'Authorization': `Bearer ${supabase.supabaseKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-        if (error) throw error;
-        setInsights(data.content);
+        if (!response.ok) {
+          throw new Error('Failed to fetch insights');
+        }
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+
+        setInsights(data.insights.content);
+        setGeneratedAt(data.insights.generated_at);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -48,6 +57,11 @@ export default function LearningInsights() {
           ) : (
             <div className="prose max-w-none">
               <p className="text-lg leading-relaxed">{insights}</p>
+              {generatedAt && (
+                <p className="text-sm text-gray-500 mt-4">
+                  Last updated: {new Date(generatedAt).toLocaleString()}
+                </p>
+              )}
             </div>
           )}
         </CardContent>
