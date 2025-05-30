@@ -8,6 +8,10 @@ const corsHeaders = {
 };
 
 async function syncNotionToSupabase(notionKey: string, notionDbId: string, supabaseClient: any) {
+  // First, clear existing data to prevent duplicates
+  await supabaseClient.from('bookmark_tags').delete().neq('bookmark_id', null);
+  await supabaseClient.from('bookmarks').delete().neq('id', null);
+  
   // Fetch pages from Notion database
   const response = await fetch(`https://api.notion.com/v1/databases/${notionDbId}/query`, {
     method: "POST",
@@ -32,6 +36,7 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
   }
 
   const data = await response.json();
+  const syncedBookmarks = [];
   
   // Process each bookmark
   for (const page of data.results) {
@@ -41,7 +46,8 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
       main_tag: page.properties.MainTag?.select?.name || "Miscellaneous",
       tags: page.properties.Tags?.multi_select?.map((t: any) => t.name) || [],
       summarized_text: page.properties.SummarizedText?.rich_text?.[0]?.plain_text || "",
-      type: "article"
+      type: "article",
+      created_at: page.properties.Created?.date?.start || page.created_time
     };
 
     // 1. Get or create main tag
@@ -61,7 +67,8 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
         url: bookmark.url,
         main_tag_id: mainTagId,
         type: bookmark.type,
-        summarized_text: bookmark.summarized_text
+        summarized_text: bookmark.summarized_text,
+        created_at: bookmark.created_at
       })
       .select('id')
       .single();
@@ -101,7 +108,11 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
           });
       }
     }
+
+    syncedBookmarks.push(bookmarkData.id);
   }
+
+  return syncedBookmarks;
 }
 
 serve(async (req) => {
@@ -121,9 +132,13 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    await syncNotionToSupabase(notionKey, notionDbId, supabase);
+    const syncedBookmarks = await syncNotionToSupabase(notionKey, notionDbId, supabase);
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: `Successfully synced ${syncedBookmarks.length} bookmarks`,
+      syncedBookmarks 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (error) {
