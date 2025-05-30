@@ -43,18 +43,23 @@ serve(async (req) => {
       tags: [...bookmark.bookmark_tags.map(bt => bt.tags.name), bookmark.main_tags.name]
     }));
 
-    const prompt = `Analyze the following reading history and create a brief, engaging profile of Likhith's learning journey and interests:
+    const prompt = `Based on the following reading history, create a brief, impactful snapshot of Likhith's professional focus:
 
 Reading Data:
 ${formattedBookmarks.map(b => `- "${b.title}" (${b.date}) [${b.tags.join(', ')}]`).join('\n')}
 
-Create a concise, third-person narrative that:
-1. Identifies 2-3 core areas Likhith is deeply exploring
-2. Highlights any clear transition or evolution in interests
-3. Points out emerging topics or new directions
-4. Notes any interesting patterns in how topics interconnect
+Format the response in two short parts:
+1. Core Focus (1 line):
+A punchy statement about primary expertise/interest
 
-Keep the tone professional yet conversational, as if introducing Likhith's interests to someone viewing his profile. Limit to 3-4 sentences.`;
+2. Current Exploration (1 line):
+What's new or emerging in the learning journey
+
+Keep each line under 15 words. Write for quick scanning, not detailed reading.
+
+Example style:
+"🎯 Product leader focused on strategic frameworks and team alignment methodologies.
+🌱 Exploring AI's integration with fintech, emphasizing customer-centric innovation."`;
 
     // Get insights from OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -68,7 +73,7 @@ Keep the tone professional yet conversational, as if introducing Likhith's inter
         messages: [
           {
             role: 'system',
-            content: 'You are an expert analyst creating concise, engaging learning journey profiles.'
+            content: 'You are an expert analyst creating concise, impactful professional focus summaries.'
           },
           {
             role: 'user',
