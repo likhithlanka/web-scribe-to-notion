@@ -10,11 +10,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 // Utility to fetch Notion data from your Supabase Edge Function
 async function fetchNotionArticles() {
   try {
-    const res = await fetch('https://ypkfdgvuipvfhktqqmpr.functions.supabase.co/list-notion-bookmarks');
+    const apiUrl = `${supabase.supabaseUrl}/functions/v1/list-notion-bookmarks`;
+    const res = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${supabase.supabaseKey}`,
+      },
+    });
+    
     if (!res.ok) {
       const error = await res.text();
       throw new Error(error || 'Failed to fetch Notion articles');
