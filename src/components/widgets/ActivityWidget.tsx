@@ -41,7 +41,7 @@ export function ActivityWidget() {
 
   return (
     <Card className="w-full h-full flex flex-col">
-      <CardHeader className="flex-none py-2">
+      <CardHeader className="flex-none py-1">
         <CardTitle className="text-lg sm:text-xl">Learning Activity</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 p-0">
@@ -50,9 +50,9 @@ export function ActivityWidget() {
             <div className="h-full bg-gray-200 rounded"></div>
           </div>
         ) : error ? (
-          <div className="text-red-500 text-sm p-4">{error}</div>
+          <div className="text-red-500 text-sm px-2">{error}</div>
         ) : (
-          <div className="w-full h-full">
+          <div className="w-full h-full px-2">
             <CalendarHeatmap
               startDate={subMonths(new Date(), 12)}
               endDate={new Date()}
@@ -63,6 +63,7 @@ export function ActivityWidget() {
               }}
               showWeekdayLabels={true}
               gutterSize={1}
+              horizontal={true}
             />
           </div>
         )}
