@@ -42,7 +42,7 @@ export function ActivityWidget() {
   return (
     <Card className="w-full h-full flex flex-col">
       <CardHeader className="flex-none py-1">
-        <CardTitle className="text-lg">Learning Activity</CardTitle>
+        <CardTitle className="text-2xl font-semibold">Learning Activity</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 pt-0 px-1 pb-1">
         {loading ? (
