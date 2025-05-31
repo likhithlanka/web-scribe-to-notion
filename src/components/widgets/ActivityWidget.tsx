@@ -40,14 +40,14 @@ export function ActivityWidget() {
   }, []);
 
   return (
-    <Card className="w-full h-full flex flex-col">
-      <CardHeader className="flex-none py-1">
-        <CardTitle className="text-2xl font-semibold">Learning Activity</CardTitle>
+    <Card className="w-full h-full flex flex-col bg-white shadow-sm border-[#E9ECEF]">
+      <CardHeader className="flex-none py-4 px-6">
+        <CardTitle className="text-xl font-medium text-[#37352F]">Learning Activity</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 pt-0 px-1 pb-1">
+      <CardContent className="flex-1 pt-2 px-6 pb-6">
         {loading ? (
           <div className="animate-pulse w-full h-32">
-            <div className="h-full bg-gray-200 rounded"></div>
+            <div className="h-full bg-[#F1F3F5] rounded"></div>
           </div>
         ) : error ? (
           <div className="text-red-500 text-sm">{error}</div>
@@ -62,7 +62,11 @@ export function ActivityWidget() {
                 return `color-scale-${Math.min(value.count, 4)}`;
               }}
               showWeekdayLabels={true}
-              gutterSize={1}
+              gutterSize={2}
+              titleForValue={(value) => {
+                if (!value) return 'No bookmarks';
+                return `${value.count} bookmark${value.count !== 1 ? 's' : ''} on ${value.date}`;
+              }}
             />
           </div>
         )}

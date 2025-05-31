@@ -76,22 +76,37 @@
 }
 
 /* Calendar Heatmap Custom Styles */
+.react-calendar-heatmap {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, 'Apple Color Emoji', Arial, sans-serif, 'Segoe UI Emoji', 'Segoe UI Symbol';
+}
+
+.react-calendar-heatmap text {
+  font-size: 10px;
+  fill: #9BA2A8;
+}
+
+.react-calendar-heatmap rect {
+  rx: 2;
+}
+
 .react-calendar-heatmap .color-empty {
-  fill: #ebedf0;
+  fill: #F1F3F5;
 }
 
 .react-calendar-heatmap .color-scale-1 {
-  fill: #9be9a8;
+  fill: #E3FCEF;
 }
 
 .react-calendar-heatmap .color-scale-2 {
-  fill: #40c463;
+  fill: #37B96D;
+  opacity: 0.4;
 }
 
 .react-calendar-heatmap .color-scale-3 {
-  fill: #30a14e;
+  fill: #37B96D;
+  opacity: 0.7;
 }
 
 .react-calendar-heatmap .color-scale-4 {
-  fill: #216e39;
+  fill: #37B96D;
 }
