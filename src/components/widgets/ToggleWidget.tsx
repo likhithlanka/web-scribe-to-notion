@@ -50,9 +50,9 @@ export function ToggleWidget() {
               <ActivityWidget />
             </div>
             <div className="w-1/2 flex-shrink-0">
-              <div className="p-4 space-y-4">
+              <div className="p-3 space-y-3">
                 <ProfileWidget />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <TotalBookmarksWidget />
                   <UniqueTagsWidget />
                   <TopicWidget />
