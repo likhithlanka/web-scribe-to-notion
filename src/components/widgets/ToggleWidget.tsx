@@ -15,7 +15,7 @@ export function ToggleWidget() {
     // Auto-switch to profile view after 1 second
     const timer = setTimeout(() => {
       setCurrentView('profile');
-    }, 1000);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, []);
