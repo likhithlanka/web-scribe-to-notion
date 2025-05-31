@@ -72,6 +72,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "liga" 1, "calt" 1;
   }
 }
 
@@ -93,8 +94,16 @@
   fill: #F1F3F5;
 }
 
+.dark .react-calendar-heatmap .color-empty {
+  fill: #2F3437;
+}
+
 .react-calendar-heatmap .color-scale-1 {
   fill: #E3FCEF;
+}
+
+.dark .react-calendar-heatmap .color-scale-1 {
+  fill: #133929;
 }
 
 .react-calendar-heatmap .color-scale-2 {
@@ -102,11 +111,25 @@
   opacity: 0.4;
 }
 
+.dark .react-calendar-heatmap .color-scale-2 {
+  fill: #26AB5B;
+  opacity: 0.5;
+}
+
 .react-calendar-heatmap .color-scale-3 {
   fill: #37B96D;
   opacity: 0.7;
 }
 
+.dark .react-calendar-heatmap .color-scale-3 {
+  fill: #26AB5B;
+  opacity: 0.8;
+}
+
 .react-calendar-heatmap .color-scale-4 {
   fill: #37B96D;
+}
+
+.dark .react-calendar-heatmap .color-scale-4 {
+  fill: #26AB5B;
 }
