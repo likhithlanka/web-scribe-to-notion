@@ -11,6 +11,7 @@ import UniqueTagsPage from "./pages/widgets/unique-tags";
 import TopicPage from "./pages/widgets/topic";
 import ActivityPage from "./pages/widgets/activity";
 import ProfilePage from "./pages/widgets/profile";
+import TogglePage from "./pages/widgets/toggle";
 
 const queryClient = new QueryClient();
 
@@ -28,11 +29,10 @@ const App = () => (
           <Route path="/widgets/topic" element={<TopicPage />} />
           <Route path="/widgets/activity" element={<ActivityPage />} />
           <Route path="/widgets/profile" element={<ProfilePage />} />
+          <Route path="/widgets/toggle" element={<TogglePage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
-
-export default App;
