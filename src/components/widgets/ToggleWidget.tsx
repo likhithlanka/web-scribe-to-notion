@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ActivityWidget } from "./ActivityWidget";
 import { ProfileWidget } from "./ProfileWidget";
+import { TopicWidget } from "./TopicWidget";
+import { TotalBookmarksWidget } from "./TotalBookmarksWidget";
+import { UniqueTagsWidget } from "./UniqueTagsWidget";
 
 export function ToggleWidget() {
   const [currentView, setCurrentView] = useState<'activity' | 'profile'>('activity');
@@ -46,8 +49,15 @@ export function ToggleWidget() {
             <div className="w-1/2 h-full flex-shrink-0">
               <ActivityWidget />
             </div>
-            <div className="w-1/2 h-full flex-shrink-0">
-              <ProfileWidget />
+            <div className="w-1/2 h-full flex-shrink-0 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                <ProfileWidget />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <TotalBookmarksWidget />
+                  <UniqueTagsWidget />
+                  <TopicWidget />
+                </div>
+              </div>
             </div>
           </div>
         </div>
