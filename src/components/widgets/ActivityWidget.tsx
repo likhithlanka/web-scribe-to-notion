@@ -41,18 +41,18 @@ export function ActivityWidget() {
 
   return (
     <Card className="w-full h-full flex flex-col">
-      <CardHeader className="flex-none py-1">
+      <CardHeader className="flex-none pb-2">
         <CardTitle className="text-lg sm:text-xl">Learning Activity</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 p-0">
+      <CardContent className="flex-1 flex items-center justify-center">
         {loading ? (
           <div className="animate-pulse w-full h-full">
             <div className="h-full bg-gray-200 rounded"></div>
           </div>
         ) : error ? (
-          <div className="text-red-500 text-sm px-2">{error}</div>
+          <div className="text-red-500 text-sm">{error}</div>
         ) : (
-          <div className="w-full h-full px-2">
+          <div className="w-full h-full flex items-center">
             <CalendarHeatmap
               startDate={subMonths(new Date(), 12)}
               endDate={new Date()}
@@ -61,9 +61,6 @@ export function ActivityWidget() {
                 if (!value) return 'color-empty';
                 return `color-scale-${Math.min(value.count, 4)}`;
               }}
-              showWeekdayLabels={true}
-              gutterSize={1}
-              horizontal={true}
             />
           </div>
         )}
