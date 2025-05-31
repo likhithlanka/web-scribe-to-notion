@@ -8,9 +8,13 @@ const corsHeaders = {
 };
 
 async function syncNotionToSupabase(notionKey: string, notionDbId: string, supabaseClient: any) {
-  // First, clear existing data to prevent duplicates
-  await supabaseClient.from('bookmark_tags').delete().neq('bookmark_id', null);
-  await supabaseClient.from('bookmarks').delete().neq('id', null);
+  // Get existing bookmark URLs to avoid duplicates
+  const { data: existingBookmarks } = await supabaseClient
+    .from('bookmarks')
+    .select('url, title');
+    
+  const existingUrls = new Set(existingBookmarks?.map(b => b.url) || []);
+  const existingTitles = new Set(existingBookmarks?.map(b => b.title) || []);
   
   // First, fetch main tags from Notion database properties
   const dbResponse = await fetch(`https://api.notion.com/v1/databases/${notionDbId}`, {
@@ -28,7 +32,7 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
   const dbData = await dbResponse.json();
   const mainTagOptions = dbData.properties.MainTag?.select?.options || [];
 
-  // Sync main tags first
+  // Sync main tags (upsert - only add new ones)
   for (const mainTag of mainTagOptions) {
     await supabaseClient
       .from('main_tags')
@@ -64,16 +68,27 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
   }
 
   const data = await response.json();
-  const syncedBookmarks = [];
+  const newBookmarks = [];
+  let skippedBookmarks = 0;
   
-  // Process each bookmark
+  // Process each bookmark - only add new ones
   for (const page of data.results) {
+    const title = page.properties.Name?.title?.[0]?.plain_text || "";
+    const url = page.properties.URL?.url || "";
+    
+    // Skip if bookmark already exists (check by URL or title)
+    if (existingUrls.has(url) || existingTitles.has(title)) {
+      skippedBookmarks++;
+      console.log(`Skipping existing bookmark: ${title}`);
+      continue;
+    }
+    
     // Get the correct creation time
     const createdTime = page.properties.Created?.date?.start || page.created_time;
     
     const bookmark = {
-      title: page.properties.Name?.title?.[0]?.plain_text || "",
-      url: page.properties.URL?.url || "",
+      title,
+      url,
       main_tag: page.properties.MainTag?.select?.name || "Miscellaneous",
       tags: page.properties.Tags?.multi_select?.map((t: any) => t.name) || [],
       summarized_text: page.properties.SummarizedText?.rich_text?.[0]?.plain_text || "",
@@ -97,16 +112,15 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
         .eq('name', 'Miscellaneous')
         .single();
       bookmark.main_tag = 'Miscellaneous';
-      mainTagData = miscTag;
     }
 
-    // Insert bookmark with correct timestamps
+    // Insert new bookmark
     const { data: bookmarkData, error: bookmarkError } = await supabaseClient
       .from('bookmarks')
       .insert({
         title: bookmark.title,
         url: bookmark.url,
-        main_tag_id: mainTagData.id,
+        main_tag_id: mainTagData?.id,
         type: bookmark.type,
         summarized_text: bookmark.summarized_text,
         created_at: bookmark.created_at,
@@ -120,47 +134,46 @@ async function syncNotionToSupabase(notionKey: string, notionDbId: string, supab
       continue;
     }
 
-    // Process tags
+    // Process tags for new bookmark
     for (const tagName of bookmark.tags) {
-      // Get or create tag
+      // Get or create tag (upsert)
       const { data: tagData } = await supabaseClient
         .from('tags')
+        .upsert({ 
+          name: tagName,
+          updated_at: new Date().toISOString()
+        }, { 
+          onConflict: 'name' 
+        })
         .select('id')
-        .eq('name', tagName)
         .single();
 
-      let tagId = tagData?.id;
-
-      if (!tagId) {
-        const { data: newTag } = await supabaseClient
-          .from('tags')
-          .insert({ name: tagName })
-          .select('id')
-          .single();
-        tagId = newTag?.id;
-      }
-
       // Create bookmark-tag relationship
-      if (tagId) {
+      if (tagData?.id) {
         await supabaseClient
           .from('bookmark_tags')
           .insert({
             bookmark_id: bookmarkData.id,
-            tag_id: tagId,
-            created_at: bookmark.created_at // Use the same creation time
+            tag_id: tagData.id,
+            created_at: bookmark.created_at
           });
       }
     }
 
-    syncedBookmarks.push(bookmarkData.id);
+    newBookmarks.push(bookmarkData.id);
   }
 
-  return syncedBookmarks;
+  return { 
+    newBookmarks, 
+    newCount: newBookmarks.length, 
+    skippedCount: skippedBookmarks,
+    totalProcessed: data.results.length 
+  };
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -175,12 +188,17 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    const syncedBookmarks = await syncNotionToSupabase(notionKey, notionDbId, supabase);
+    const result = await syncNotionToSupabase(notionKey, notionDbId, supabase);
 
     return new Response(JSON.stringify({ 
       success: true,
-      message: `Successfully synced ${syncedBookmarks.length} bookmarks`,
-      syncedBookmarks 
+      message: `Successfully processed ${result.totalProcessed} bookmarks: ${result.newCount} new, ${result.skippedCount} skipped`,
+      newBookmarks: result.newBookmarks,
+      stats: {
+        newCount: result.newCount,
+        skippedCount: result.skippedCount,
+        totalProcessed: result.totalProcessed
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
