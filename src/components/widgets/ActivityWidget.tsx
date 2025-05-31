@@ -70,3 +70,5 @@ export function ActivityWidget() {
     </Card>
   );
 }
+
+export { ActivityWidget }
