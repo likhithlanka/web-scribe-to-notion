@@ -40,27 +40,29 @@ export function ActivityWidget() {
   }, []);
 
   return (
-    <Card className="w-full max-w-md mx-auto bg-white">
+    <Card className="w-full h-full bg-white">
       <CardHeader>
         <CardTitle>Learning Activity</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="h-[calc(100%-4rem)] min-h-[200px]">
         {loading ? (
-          <div className="animate-pulse">
-            <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="animate-pulse h-full">
+            <div className="h-full bg-gray-200 rounded"></div>
           </div>
         ) : error ? (
           <div className="text-red-500 text-sm">{error}</div>
         ) : (
-          <CalendarHeatmap
-            startDate={subMonths(new Date(), 12)}
-            endDate={new Date()}
-            values={activity}
-            classForValue={(value) => {
-              if (!value) return 'color-empty';
-              return `color-scale-${Math.min(value.count, 4)}`;
-            }}
-          />
+          <div className="h-full">
+            <CalendarHeatmap
+              startDate={subMonths(new Date(), 12)}
+              endDate={new Date()}
+              values={activity}
+              classForValue={(value) => {
+                if (!value) return 'color-empty';
+                return `color-scale-${Math.min(value.count, 4)}`;
+              }}
+            />
+          </div>
         )}
       </CardContent>
     </Card>

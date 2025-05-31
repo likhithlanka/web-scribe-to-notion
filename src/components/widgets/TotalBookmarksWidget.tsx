@@ -27,7 +27,7 @@ export function TotalBookmarksWidget() {
   }, []);
 
   return (
-    <Card className="w-full max-w-md mx-auto bg-white">
+    <Card className="w-full h-full bg-white">
       <CardHeader>
         <CardTitle>Total Bookmarks</CardTitle>
       </CardHeader>
