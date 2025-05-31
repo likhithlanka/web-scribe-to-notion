@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -10,6 +10,15 @@ import { UniqueTagsWidget } from "./UniqueTagsWidget";
 
 export function ToggleWidget() {
   const [currentView, setCurrentView] = useState<'activity' | 'profile'>('activity');
+
+  useEffect(() => {
+    // Auto-switch to profile view after 1 second
+    const timer = setTimeout(() => {
+      setCurrentView('profile');
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="w-full flex items-center justify-center">
