@@ -34,22 +34,26 @@ export function ProfileWidget() {
   }, []);
 
   return (
-    <Card className="w-full h-full flex flex-col">
-      <CardHeader className="flex-none pb-2">
-        <CardTitle className="text-lg sm:text-xl">Likhith's Learning Profile</CardTitle>
+    <Card className="w-full h-full flex flex-col bg-white dark:bg-[#191919] border-[#E9ECEF] dark:border-[#2F3437]">
+      <CardHeader className="flex-none pb-2 px-6 pt-5">
+        <CardTitle className="text-xl font-medium text-[#37352F] dark:text-[#E3E3E1] font-['Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,'Apple Color Emoji',Arial,sans-serif,'Segoe UI Emoji','Segoe UI Symbol']">
+          Likhith's Learning Profile
+        </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex items-center">
+      <CardContent className="flex-1 px-6 pb-6">
         {loading ? (
-          <div className="animate-pulse space-y-2 w-full">
-            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 rounded w-full"></div>
-            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+          <div className="space-y-3">
+            <div className="h-4 bg-[#F1F3F5] dark:bg-[#2F3437] rounded-sm w-3/4 animate-pulse"></div>
+            <div className="h-4 bg-[#F1F3F5] dark:bg-[#2F3437] rounded-sm w-full animate-pulse"></div>
+            <div className="h-4 bg-[#F1F3F5] dark:bg-[#2F3437] rounded-sm w-2/3 animate-pulse"></div>
           </div>
         ) : error ? (
-          <div className="text-red-500 text-sm">{error}</div>
+          <div className="text-[#EB5757] dark:text-[#FF6B6B] text-sm">{error}</div>
         ) : (
-          <div className="w-full">
-            <p className="text-base sm:text-lg leading-relaxed whitespace-pre-line">{insights}</p>
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <p className="text-[15px] leading-[24px] text-[#37352F] dark:text-[#E3E3E1] font-['Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,'Apple Color Emoji',Arial,sans-serif,'Segoe UI Emoji','Segoe UI Symbol']">
+              {insights}
+            </p>
           </div>
         )}
       </CardContent>
