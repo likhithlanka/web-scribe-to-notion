@@ -27,8 +27,8 @@ export function UniqueTagsWidget() {
   }, []);
 
   return (
-    <Card className="w-full h-full min-h-[8rem] flex flex-col">
-      <CardHeader className="flex-none">
+    <Card className="w-full h-full flex flex-col">
+      <CardHeader className="flex-none pb-2">
         <CardTitle className="text-lg sm:text-xl">Unique Tags</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex items-center justify-center">

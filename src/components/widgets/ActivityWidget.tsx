@@ -40,11 +40,11 @@ export function ActivityWidget() {
   }, []);
 
   return (
-    <Card className="w-full h-full min-h-[12rem] flex flex-col">
-      <CardHeader className="flex-none">
+    <Card className="w-full h-full flex flex-col">
+      <CardHeader className="flex-none pb-2">
         <CardTitle className="text-lg sm:text-xl">Learning Activity</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex items-center justify-center overflow-hidden">
+      <CardContent className="flex-1 flex items-center justify-center">
         {loading ? (
           <div className="animate-pulse w-full h-full">
             <div className="h-full bg-gray-200 rounded"></div>
