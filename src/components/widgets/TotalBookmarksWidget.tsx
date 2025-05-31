@@ -27,11 +27,11 @@ export function TotalBookmarksWidget() {
   }, []);
 
   return (
-    <Card className="w-full h-full bg-white">
-      <CardHeader>
-        <CardTitle>Total Bookmarks</CardTitle>
+    <Card className="w-full h-full min-h-[8rem] flex flex-col">
+      <CardHeader className="flex-none">
+        <CardTitle className="text-lg sm:text-xl">Total Bookmarks</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 flex items-center justify-center">
         {loading ? (
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-16"></div>
@@ -39,7 +39,7 @@ export function TotalBookmarksWidget() {
         ) : error ? (
           <div className="text-red-500 text-sm">{error}</div>
         ) : (
-          <div className="text-3xl font-bold">{count}</div>
+          <div className="text-2xl sm:text-3xl md:text-4xl font-bold">{count}</div>
         )}
       </CardContent>
     </Card>

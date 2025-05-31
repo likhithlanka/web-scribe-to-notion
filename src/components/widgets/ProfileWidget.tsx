@@ -34,13 +34,13 @@ export function ProfileWidget() {
   }, []);
 
   return (
-    <Card className="w-full h-full bg-white">
-      <CardHeader>
-        <CardTitle>Likhith's Learning Profile</CardTitle>
+    <Card className="w-full h-full min-h-[12rem] flex flex-col">
+      <CardHeader className="flex-none">
+        <CardTitle className="text-lg sm:text-xl">Likhith's Learning Profile</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 flex items-center overflow-y-auto">
         {loading ? (
-          <div className="animate-pulse space-y-2">
+          <div className="animate-pulse space-y-2 w-full">
             <div className="h-4 bg-gray-200 rounded w-3/4"></div>
             <div className="h-4 bg-gray-200 rounded w-full"></div>
             <div className="h-4 bg-gray-200 rounded w-2/3"></div>
@@ -48,8 +48,8 @@ export function ProfileWidget() {
         ) : error ? (
           <div className="text-red-500 text-sm">{error}</div>
         ) : (
-          <div className="prose max-w-none">
-            <p className="text-lg leading-relaxed">{insights}</p>
+          <div className="prose max-w-none w-full">
+            <p className="text-base sm:text-lg leading-relaxed">{insights}</p>
           </div>
         )}
       </CardContent>

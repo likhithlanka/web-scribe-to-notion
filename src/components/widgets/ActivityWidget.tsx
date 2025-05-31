@@ -40,19 +40,19 @@ export function ActivityWidget() {
   }, []);
 
   return (
-    <Card className="w-full h-full bg-white">
-      <CardHeader>
-        <CardTitle>Learning Activity</CardTitle>
+    <Card className="w-full h-full min-h-[12rem] flex flex-col">
+      <CardHeader className="flex-none">
+        <CardTitle className="text-lg sm:text-xl">Learning Activity</CardTitle>
       </CardHeader>
-      <CardContent className="h-[calc(100%-4rem)] min-h-[200px]">
+      <CardContent className="flex-1 flex items-center justify-center overflow-hidden">
         {loading ? (
-          <div className="animate-pulse h-full">
+          <div className="animate-pulse w-full h-full">
             <div className="h-full bg-gray-200 rounded"></div>
           </div>
         ) : error ? (
           <div className="text-red-500 text-sm">{error}</div>
         ) : (
-          <div className="h-full">
+          <div className="w-full h-full flex items-center">
             <CalendarHeatmap
               startDate={subMonths(new Date(), 12)}
               endDate={new Date()}

@@ -41,11 +41,11 @@ export function TopicWidget() {
   }, []);
 
   return (
-    <Card className="w-full h-full bg-white">
-      <CardHeader>
-        <CardTitle>Most Common Topic</CardTitle>
+    <Card className="w-full h-full min-h-[8rem] flex flex-col">
+      <CardHeader className="flex-none">
+        <CardTitle className="text-lg sm:text-xl">Most Common Topic</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 flex items-center justify-center">
         {loading ? (
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-32"></div>
@@ -53,7 +53,7 @@ export function TopicWidget() {
         ) : error ? (
           <div className="text-red-500 text-sm">{error}</div>
         ) : (
-          <div className="text-3xl font-bold">{topic}</div>
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-center">{topic}</div>
         )}
       </CardContent>
     </Card>
