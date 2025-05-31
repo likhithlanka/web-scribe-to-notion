@@ -41,10 +41,10 @@ export function ActivityWidget() {
 
   return (
     <Card className="w-full h-full flex flex-col">
-      <CardHeader className="flex-none py-4">
+      <CardHeader className="flex-none py-1">
         <CardTitle className="text-2xl font-semibold">Learning Activity</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 px-4 pb-4">
+      <CardContent className="flex-1 pt-0 px-1 pb-1">
         {loading ? (
           <div className="animate-pulse w-full h-32">
             <div className="h-full bg-gray-200 rounded"></div>
@@ -62,7 +62,7 @@ export function ActivityWidget() {
                 return `color-scale-${Math.min(value.count, 4)}`;
               }}
               showWeekdayLabels={true}
-              gutterSize={2}
+              gutterSize={1}
             />
           </div>
         )}
@@ -70,5 +70,3 @@ export function ActivityWidget() {
     </Card>
   );
 }
-
-export { ActivityWidget }
