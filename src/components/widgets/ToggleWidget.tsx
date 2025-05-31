@@ -12,8 +12,8 @@ export function ToggleWidget() {
   const [currentView, setCurrentView] = useState<'activity' | 'profile'>('activity');
 
   return (
-    <div className="w-full h-full flex items-center justify-center">
-      <Card className="w-full h-full flex flex-col bg-white dark:bg-[#191919] border-[#E9ECEF] dark:border-[#2F3437] relative overflow-hidden">
+    <div className="w-full flex items-center justify-center">
+      <Card className="w-full flex flex-col bg-white dark:bg-[#191919] border-[#E9ECEF] dark:border-[#2F3437] relative overflow-hidden">
         <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10">
           <Button
             variant="ghost"
@@ -38,18 +38,18 @@ export function ToggleWidget() {
           </Button>
         </div>
 
-        <div className="relative w-full h-full overflow-hidden">
+        <div className="relative w-full overflow-hidden">
           <div
-            className="flex transition-transform duration-300 ease-in-out h-full"
+            className="flex transition-transform duration-300 ease-in-out"
             style={{
               transform: `translateX(${currentView === 'profile' ? '-50%' : '0'})`,
               width: '200%'
             }}
           >
-            <div className="w-1/2 h-full flex-shrink-0">
+            <div className="w-1/2 flex-shrink-0">
               <ActivityWidget />
             </div>
-            <div className="w-1/2 h-full flex-shrink-0 overflow-y-auto">
+            <div className="w-1/2 flex-shrink-0">
               <div className="p-4 space-y-4">
                 <ProfileWidget />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
